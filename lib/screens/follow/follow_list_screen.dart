@@ -4,7 +4,7 @@ import 'package:vroom/supabase/supabase_config.dart';
 
 class FollowListScreen extends StatefulWidget {
   final String userId;
-  final String type; // 'followers' или 'following'
+  final String type; 
   final String title;
 
   const FollowListScreen({
@@ -21,8 +21,8 @@ class FollowListScreen extends StatefulWidget {
 class _FollowListScreenState extends State<FollowListScreen> {
   List<Map<String, dynamic>> _users = [];
   bool _isLoading = true;
-  Map<String, bool> _followingStatus = {}; // Статус подписки для каждого пользователя
-  Map<String, bool> _friendshipStatus = {}; // Статус дружбы для каждого пользователя
+  Map<String, bool> _followingStatus = {}; 
+  Map<String, bool> _friendshipStatus = {}; 
 
   @override
   void initState() {
@@ -35,23 +35,19 @@ class _FollowListScreenState extends State<FollowListScreen> {
       List<Map<String, dynamic>> users = [];
 
       if (widget.type == 'followers') {
-        // Загружаем подписчиков (кто подписан на этого пользователя)
         final response = await SupabaseConfig.client
             .from('follows')
             .select('follower_id')
             .eq('following_id', widget.userId);
 
-        // Собираем ID всех подписчиков
         final followerIds = response.map((item) => item['follower_id'] as String).toList();
 
         if (followerIds.isNotEmpty) {
-          // Загружаем профили подписчиков
           final profilesResponse = await SupabaseConfig.client
               .from('profiles')
               .select('id, username, avatar_url, bio')
               .inFilter('id', followerIds);
 
-          // Добавляем профили в список
           for (var profile in profilesResponse) {
             users.add({
               'id': profile['id'],
@@ -62,23 +58,19 @@ class _FollowListScreenState extends State<FollowListScreen> {
           }
         }
       } else if (widget.type == 'following') {
-        // Загружаем подписки (на кого подписан этот пользователь)
         final response = await SupabaseConfig.client
             .from('follows')
             .select('following_id')
             .eq('follower_id', widget.userId);
 
-        // Собираем ID всех подписок
         final followingIds = response.map((item) => item['following_id'] as String).toList();
 
         if (followingIds.isNotEmpty) {
-          // Загружаем профили подписок
           final profilesResponse = await SupabaseConfig.client
               .from('profiles')
               .select('id, username, avatar_url, bio')
               .inFilter('id', followingIds);
 
-          // Добавляем профили в список
           for (var profile in profilesResponse) {
             users.add({
               'id': profile['id'],
@@ -90,10 +82,8 @@ class _FollowListScreenState extends State<FollowListScreen> {
         }
       }
 
-      // Загружаем статусы подписки для каждого пользователя
       await _loadFollowingStatus(users);
       
-      // Загружаем статусы дружбы для каждого пользователя
       await _loadFriendshipStatus(users);
 
       setState(() {
@@ -113,24 +103,20 @@ class _FollowListScreenState extends State<FollowListScreen> {
     if (currentUserId == null) return;
 
     try {
-      // Собираем ID всех пользователей
       final userIds = users.map((user) => user['id'] as String).toList();
       
       if (userIds.isEmpty) return;
 
-      // Загружаем всех, на кого подписан текущий пользователь
       final response = await SupabaseConfig.client
           .from('follows')
           .select('following_id')
           .eq('follower_id', currentUserId)
           .inFilter('following_id', userIds);
 
-      // Создаем Set для быстрой проверки
       final followingSet = Set<String>.from(
         response.map((item) => item['following_id'] as String)
       );
 
-      // Устанавливаем статус для каждого пользователя
       for (var user in users) {
         final userId = user['id'] as String;
         _followingStatus[userId] = followingSet.contains(userId);
@@ -147,7 +133,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
     if (currentUserId == null) return;
 
     try {
-      // Для каждого пользователя проверяем взаимные подписки
       for (var user in users) {
         final userId = user['id'] as String;
         
@@ -156,7 +141,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
           continue;
         }
         
-        // 1. Проверяем, подписан ли текущий пользователь на этого пользователя
         final isFollowingResponse = await SupabaseConfig.client
             .from('follows')
             .select()
@@ -165,7 +149,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
         
         final isCurrentUserFollowing = isFollowingResponse.isNotEmpty;
         
-        // 2. Проверяем, подписан ли этот пользователь на текущего
         final isFollowedBackResponse = await SupabaseConfig.client
             .from('follows')
             .select()
@@ -174,7 +157,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
         
         final isFollowedBack = isFollowedBackResponse.isNotEmpty;
         
-        // 3. Они друзья, если оба подписаны друг на друга
         _friendshipStatus[userId] = isCurrentUserFollowing && isFollowedBack;
       }
       
@@ -200,14 +182,12 @@ class _FollowListScreenState extends State<FollowListScreen> {
 
     try {
       if (currentlyFollowing) {
-        // Отписаться
         await SupabaseConfig.client
             .from('follows')
             .delete()
             .eq('follower_id', currentUserId)
             .eq('following_id', userId);
       } else {
-        // Подписаться
         await SupabaseConfig.client.from('follows').insert({
           'follower_id': currentUserId,
           'following_id': userId,
@@ -217,7 +197,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
       setState(() {
         _followingStatus[userId] = !currentlyFollowing;
         
-        // После изменения подписки перепроверяем статус дружбы
         _checkFriendshipStatusForUser(userId);
       });
 
@@ -245,7 +224,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
     if (currentUserId == null || currentUserId == userId) return;
 
     try {
-      // 1. Проверяем, подписан ли текущий пользователь на этого пользователя
       final isFollowingResponse = await SupabaseConfig.client
           .from('follows')
           .select()
@@ -254,7 +232,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
       
       final isCurrentUserFollowing = isFollowingResponse.isNotEmpty;
       
-      // 2. Проверяем, подписан ли этот пользователь на текущего
       final isFollowedBackResponse = await SupabaseConfig.client
           .from('follows')
           .select()
@@ -263,7 +240,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
       
       final isFollowedBack = isFollowedBackResponse.isNotEmpty;
       
-      // 3. Они друзья, если оба подписаны друг на друга
       setState(() {
         _friendshipStatus[userId] = isCurrentUserFollowing && isFollowedBack;
       });
@@ -372,7 +348,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
                           child: Row(
                             crossAxisAlignment: CrossAxisAlignment.center,
                             children: [
-                              // Аватар
                               GestureDetector(
                                 onTap: () => _openUserProfile(user['id']),
                                 child: CircleAvatar(
@@ -392,7 +367,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
                               
                               const SizedBox(width: 12),
                               
-                              // Информация о пользователе
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -430,7 +404,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
                               
                               const SizedBox(width: 12),
                               
-                              // Кнопка подписки/отписки с индикатором дружбы
                               Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -480,7 +453,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
                                       ),
                                     ),
                                   
-                                  // Индикатор дружбы - используем Center вместо Container с width: double.infinity
                                   if (!isCurrentUser && isFriend)
                                     Center(
                                       child: Padding(

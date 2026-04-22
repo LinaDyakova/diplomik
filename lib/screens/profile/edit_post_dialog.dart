@@ -53,7 +53,6 @@ class _EditPostDialogState extends State<EditPostDialog> {
   }
 
   Widget _buildImagePreview() {
-  // Если выбрано новое изображение
   if (_image != null) {
     if (kIsWeb) {
       if (_imageBytes != null) {
@@ -153,7 +152,6 @@ class _EditPostDialogState extends State<EditPostDialog> {
     }
   }
 
-  // Если есть старое изображение и не удалено
   if (widget.post['photo_url'] != null && !_isDeletingImage) {
     return Stack(
       children: [
@@ -228,7 +226,6 @@ class _EditPostDialogState extends State<EditPostDialog> {
     );
   }
 
-  // Если изображения нет
   return GestureDetector(
     onTap: _pickImage,
     child: Container(
@@ -273,7 +270,6 @@ class _EditPostDialogState extends State<EditPostDialog> {
     try {
       String? photoUrl = widget.post['photo_url'];
       
-      // Если выбрано новое изображение
       if (_image != null) {
         String fileName = '${DateTime.now().millisecondsSinceEpoch}_${_image!.name}';
         
@@ -299,12 +295,10 @@ class _EditPostDialogState extends State<EditPostDialog> {
         photoUrl = newPhotoUrl;
       }
       
-      // Если изображение удалено
       if (_isDeletingImage) {
         photoUrl = null;
       }
 
-      // ДОБАВЬТЕ ЭТУ СТРОКУ ДЛЯ ОТЛАДКИ:
       print('Updating post with data: ${{ 'content': _contentController.text.trim(), 'photo_url': photoUrl, }}');
 
       await SupabaseConfig.client.from('posts').update({

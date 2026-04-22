@@ -30,36 +30,30 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
 
   Future<void> _loadProfileData() async {
     try {
-      // Загружаем профиль пользователя
       final profileResponse = await SupabaseConfig.client
           .from('profiles')
           .select()
           .eq('id', widget.userId)
           .single();
 
-      // Загружаем посты пользователя
       final postsResponse = await SupabaseConfig.client
           .from('posts')
           .select('*, likes(count), comments(count)')
           .eq('user_id', widget.userId)
           .order('created_at', ascending: false);
 
-      // Загружаем количество подписчиков
       final followersResponse = await SupabaseConfig.client
           .from('follows')
           .select()
           .eq('following_id', widget.userId);
 
-      // Загружаем количество подписок
       final followingResponse = await SupabaseConfig.client
           .from('follows')
           .select()
           .eq('follower_id', widget.userId);
 
-      // Получаем текущего пользователя
       final currentUserId = SupabaseConfig.auth.currentUser?.id;
       
-      // Проверяем, является ли текущий пользователь другом просматриваемого пользователя
       if (currentUserId != null && currentUserId != widget.userId) {
         final isFollowingResponse = await SupabaseConfig.client
             .from('follows')
@@ -309,7 +303,6 @@ Future<void> _toggleFollow() async {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Шапка профиля
               Container(
                 padding: const EdgeInsets.all(16.0),
                 child: Column(
@@ -317,7 +310,6 @@ Future<void> _toggleFollow() async {
                     Row(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Аватар
                         Container(
                           width: 80,
                           height: 80,
@@ -343,7 +335,6 @@ Future<void> _toggleFollow() async {
                         
                         const SizedBox(width: 20),
                         
-                        // Информация о пользователе
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -367,7 +358,6 @@ Future<void> _toggleFollow() async {
                               
                               const SizedBox(height: 16),
                               
-                              // Кнопка подписки с индикатором дружбы
                               Column(
                                 children: [
                                   SizedBox(
@@ -417,7 +407,6 @@ Future<void> _toggleFollow() async {
                 ),
               ),
               
-              // Статистика
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 20.0),
                 decoration: BoxDecoration(
@@ -449,7 +438,6 @@ Future<void> _toggleFollow() async {
                       ],
                     ),
                     
-                    // Подписчики - кликабельные
                     GestureDetector(
                       onTap: () => _openFollowersList(),
                       child: Column(
@@ -473,7 +461,6 @@ Future<void> _toggleFollow() async {
                       ),
                     ),
                     
-                    // Подписки - кликабельные
                     GestureDetector(
                       onTap: () => _openFollowingList(),
                       child: Column(
@@ -500,7 +487,6 @@ Future<void> _toggleFollow() async {
                 ),
               ),
               
-              // Посты пользователя
               _buildPostsSection(),
             ],
           ),
@@ -511,10 +497,9 @@ Future<void> _toggleFollow() async {
 
   Widget _buildPostsSection() {
     if (_posts.isEmpty) {
-      // ВАЖНО: Здесь исправление - добавим контейнер с фиксированной высотой и центрированием
       return Container(
         color: Colors.white,
-        height: MediaQuery.of(context).size.height * 0.4, // Задаем фиксированную высоту
+        height: MediaQuery.of(context).size.height * 0.4,
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

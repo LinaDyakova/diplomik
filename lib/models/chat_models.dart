@@ -1,4 +1,5 @@
-// models/chat_models.dart
+import 'package:flutter/material.dart';
+
 class ChatModel {
   final int id;
   final DateTime createdAt;
@@ -10,7 +11,8 @@ class ChatModel {
   final String? groupPhotoUrl;
   final List<ChatParticipant> participants;
   final int unreadCount;
-  
+  final String type; 
+
   ChatModel({
     required this.id,
     required this.createdAt,
@@ -22,16 +24,19 @@ class ChatModel {
     this.groupPhotoUrl,
     required this.participants,
     required this.unreadCount,
+    required this.type,
   });
-  
+
   factory ChatModel.fromJson(Map<String, dynamic> json) {
+    final typeValue = json['type'] as String? ?? 
+        (json['is_group'] == true ? 'group' : 'private');
     return ChatModel(
       id: json['id'],
       createdAt: DateTime.parse(json['created_at']),
       updatedAt: DateTime.parse(json['updated_at']),
       lastMessage: json['last_message'],
-      lastMessageAt: json['last_message_at'] != null 
-          ? DateTime.parse(json['last_message_at']) 
+      lastMessageAt: json['last_message_at'] != null
+          ? DateTime.parse(json['last_message_at'])
           : null,
       isGroup: json['is_group'] ?? false,
       groupName: json['group_name'],
@@ -42,12 +47,14 @@ class ChatModel {
               .toList()
           : [],
       unreadCount: json['unread_count'] ?? 0,
+      type: typeValue,
     );
   }
-  
-  // Получаем имя чата (для приватных - имя собеседника, для групп - название группы)
+
   String getDisplayName(String currentUserId) {
-    if (isGroup) {
+    if (type == 'channel') {
+      return groupName ?? 'Канал';
+    } else if (type == 'group') {
       return groupName ?? 'Групповой чат';
     } else {
       final otherParticipant = participants.firstWhere(
@@ -57,10 +64,20 @@ class ChatModel {
       return '@${otherParticipant.username}';
     }
   }
-  
-  // Получаем аватар чата
+
+  IconData getIcon() {
+    switch (type) {
+      case 'channel':
+        return Icons.mic;
+      case 'group':
+        return Icons.group;
+      default:
+        return Icons.person;
+    }
+  }
+
   String? getAvatarUrl(String currentUserId) {
-    if (isGroup) {
+    if (type == 'channel' || type == 'group') {
       return groupPhotoUrl;
     } else {
       final otherParticipant = participants.firstWhere(
@@ -78,7 +95,7 @@ class ChatParticipant {
   final String? avatarUrl;
   final DateTime joinedAt;
   final int unreadCount;
-  
+
   ChatParticipant({
     required this.userId,
     required this.username,
@@ -86,7 +103,7 @@ class ChatParticipant {
     required this.joinedAt,
     required this.unreadCount,
   });
-  
+
   factory ChatParticipant.fromJson(Map<String, dynamic> json) {
     return ChatParticipant(
       userId: json['user_id'],
@@ -96,7 +113,7 @@ class ChatParticipant {
       unreadCount: json['unread_count'] ?? 0,
     );
   }
-  
+
   static ChatParticipant empty() {
     return ChatParticipant(
       userId: '',
@@ -112,12 +129,12 @@ class MessageModel {
   final int chatId;
   final String senderId;
   final String content;
-  final String messageType; // 'text', 'image', 'event'
+  final String messageType;
   final String? imageUrl;
   final int? eventId;
   final DateTime createdAt;
   final bool isRead;
-  
+
   MessageModel({
     required this.id,
     required this.chatId,
@@ -129,7 +146,7 @@ class MessageModel {
     required this.createdAt,
     required this.isRead,
   });
-  
+
   factory MessageModel.fromJson(Map<String, dynamic> json) {
     return MessageModel(
       id: json['id'],
@@ -143,7 +160,7 @@ class MessageModel {
       isRead: json['is_read'] ?? false,
     );
   }
-  
+
   Map<String, dynamic> toJson() {
     return {
       'chat_id': chatId,

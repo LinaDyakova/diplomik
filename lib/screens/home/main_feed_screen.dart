@@ -483,7 +483,6 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Заголовок поста с аватаркой
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
               child: Row(
@@ -521,7 +520,6 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
               ),
             ),
 
-            // Текст поста
             if (post['content'] != null && post['content'].toString().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -535,7 +533,6 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                 ),
               ),
 
-            // Изображение поста
             if (post['photo_url'] != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12.0),
@@ -585,12 +582,10 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                 ),
               ),
 
-            // Действия с постом
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 children: [
-                  // Кнопка лайка
                   IconButton(
                     onPressed: () {
                       _likePost(postId, isLiked);
@@ -614,7 +609,6 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                   ),
                   const SizedBox(width: 24),
 
-                  // Иконка комментариев
                   const Icon(
                     Icons.comment_outlined,
                     color: Colors.grey,
@@ -666,7 +660,6 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
         return;
       }
 
-      // Получаем список пользователей, на которых подписан текущий пользователь
       final followingResponse = await SupabaseConfig.client
           .from('follows')
           .select('following_id')
@@ -684,7 +677,6 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
           .map((item) => item['following_id'] as String)
           .toList();
 
-      // Получаем посты пользователей, на которых подписаны
       final response = await SupabaseConfig.client
           .from('posts')
           .select('''
@@ -811,7 +803,6 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () {
-                // Переключаем на вкладку поиска
                 final mainState = context.findAncestorStateOfType<_MainFeedScreenState>();
                 mainState?._toggleSearch();
               },
@@ -1043,19 +1034,16 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
         return;
       }
 
-      // 1. Получаем список пользователей, на которых подписан текущий пользователь
       final followingResponse = await SupabaseConfig.client
           .from('follows')
           .select('following_id')
           .eq('follower_id', userId);
 
-      // 2. Получаем список пользователей, которые подписаны на текущего пользователя
       final followersResponse = await SupabaseConfig.client
           .from('follows')
           .select('follower_id')
           .eq('following_id', userId);
 
-      // 3. Находим взаимных друзей (пересечение двух списков)
       final followingIds = followingResponse
           .map((item) => item['following_id'] as String)
           .toSet();
@@ -1074,7 +1062,6 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
         return;
       }
 
-      // 4. Получаем посты взаимных друзей
       final response = await SupabaseConfig.client
           .from('posts')
           .select('''
@@ -1201,7 +1188,6 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
             const SizedBox(height: 20),
             ElevatedButton.icon(
               onPressed: () {
-                // Переключаем на вкладку поиска
                 final mainState = context.findAncestorStateOfType<_MainFeedScreenState>();
                 mainState?._toggleSearch();
               },

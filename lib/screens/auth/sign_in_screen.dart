@@ -15,7 +15,7 @@ class _SignInScreenState extends State<SignInScreen> {
   final _usernameController = TextEditingController();
   bool _isLoading = false;
   bool _isSignUp = false;
-  bool _obscurePassword = true; // Добавляем состояние для скрытия/показа пароля
+  bool _obscurePassword = true; 
 
   Future<void> _signIn() async {
     setState(() => _isLoading = true);
@@ -44,11 +44,10 @@ class _SignInScreenState extends State<SignInScreen> {
       );
 
       if (response.user != null) {
-        // Создаем профиль пользователя с username
         await SupabaseConfig.client.from('profiles').upsert({
           'id': response.user!.id,
           'username': _usernameController.text.trim(),
-          'bio': '', // Добавляем пустую биографию
+          'bio': '', 
           'created_at': DateTime.now().toIso8601String(),
           'updated_at': DateTime.now().toIso8601String(),
         });
@@ -119,7 +118,7 @@ class _SignInScreenState extends State<SignInScreen> {
                   },
                 ),
               ),
-              obscureText: _obscurePassword, // Используем состояние для управления видимостью
+              obscureText: _obscurePassword,
             ),
 
             const SizedBox(height: 20),

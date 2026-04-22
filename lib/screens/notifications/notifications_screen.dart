@@ -21,7 +21,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   void initState() {
     super.initState();
     _loadNotifications();
-    // Инициализируем timeago с русской локалью
     timeago.setLocaleMessages('ru', timeago.RuMessages());
   }
 
@@ -36,7 +35,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
 
     print('ID текущего пользователя: $userId');
     
-    // Тестовый запрос - проверьте, что возвращает
     final testResponse = await SupabaseConfig.client
         .from('notifications')
         .select('*')
@@ -45,7 +43,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     print('Тестовый запрос (без join): $testResponse');
     print('Количество уведомлений: ${testResponse.length}');
 
-    // Основной запрос с join
     final response = await SupabaseConfig.client
         .from('notifications')
         .select('''
@@ -127,7 +124,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .eq('user_id', userId)
           .eq('is_read', false);
 
-      // Обновляем локальный список
       for (var i = 0; i < _notifications.length; i++) {
         _notifications[i] = NotificationModel(
           id: _notifications[i].id,
@@ -165,13 +161,10 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   void _handleNotificationTap(NotificationModel notification) async {
-    // Помечаем как прочитанное
     await _markAsRead(notification);
 
-    // В зависимости от типа уведомления переходим на нужный экран
     switch (notification.type) {
       case 'follow':
-        // Переходим в профиль того, кто подписался
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -182,7 +175,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         break;
       case 'like':
       case 'comment':
-        // Переходим к посту
         if (notification.postId != null) {
           Navigator.push(
             context,
@@ -229,8 +221,6 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
-// В классе _buildNotificationItem в notifications_screen.dart
-// Измените RichText чтобы он не дублировал username:
 
 Widget _buildNotificationItem(NotificationModel notification) {
   final actorProfile = notification.actorProfile;
@@ -256,7 +246,6 @@ Widget _buildNotificationItem(NotificationModel notification) {
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Иконка типа уведомления
             Container(
               width: 40,
               height: 40,
@@ -272,12 +261,10 @@ Widget _buildNotificationItem(NotificationModel notification) {
             ),
             const SizedBox(width: 12),
             
-            // Содержимое уведомления
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Текст уведомления с юзернеймом в начале
                   RichText(
                     text: TextSpan(
                       style: TextStyle(
@@ -299,11 +286,9 @@ Widget _buildNotificationItem(NotificationModel notification) {
                     ),
                   ),
                   
-                  // Время и аватар
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      // Аватар пользователя
                       if (actorAvatar != null && actorAvatar.isNotEmpty)
                         CircleAvatar(
                           radius: 12,
@@ -322,7 +307,6 @@ Widget _buildNotificationItem(NotificationModel notification) {
                       
                       const SizedBox(width: 8),
                       
-                      // Время
                       Icon(
                         Icons.access_time,
                         size: 12,
@@ -338,7 +322,6 @@ Widget _buildNotificationItem(NotificationModel notification) {
                       ),
                       const Spacer(),
                       
-                      // Индикатор непрочитанного
                       if (!notification.isRead)
                         Container(
                           width: 8,

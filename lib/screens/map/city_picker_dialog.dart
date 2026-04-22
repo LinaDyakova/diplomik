@@ -1,0 +1,136 @@
+import 'package:flutter/material.dart';
+import 'package:vroom/services/geocoding_service.dart';
+import 'dart:async';
+
+class CityPickerDialog extends StatefulWidget {
+  final Function(String city, double lat, double lon) onCitySelected;
+
+  const CityPickerDialog({super.key, required this.onCitySelected});
+
+  @override
+  State<CityPickerDialog> createState() => _CityPickerDialogState();
+}
+
+class _CityPickerDialogState extends State<CityPickerDialog> {
+  final TextEditingController _controller = TextEditingController();
+  List<Map<String, dynamic>> _searchResults = [];
+  bool _isSearching = false;
+  Timer? _debounce;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _controller.removeListener(_onSearchChanged);
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged() {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 500), () {
+      _searchCity(_controller.text.trim());
+    });
+  }
+
+  Future<void> _searchCity(String query) async {
+    if (query.isEmpty) {
+      setState(() {
+        _searchResults.clear();
+        _isSearching = false;
+      });
+      return;
+    }
+    setState(() => _isSearching = true);
+    try {
+      final result = await GeocodingService.geocodeCity(query);
+      if (result != null) {
+        setState(() {
+          _searchResults = [result];
+          _isSearching = false;
+        });
+      } else {
+        setState(() {
+          _searchResults = [];
+          _isSearching = false;
+        });
+      }
+    } catch (e) {
+      print('Search error: $e');
+      setState(() => _isSearching = false);
+    }
+  }
+
+  void _selectCity(Map<String, dynamic> city) {
+    widget.onCitySelected(
+      city['city'] ?? city['displayName'].split(',').first,
+      city['lat'],
+      city['lon'],
+    );
+    Navigator.pop(context);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'Выберите ваш город',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _controller,
+              decoration: InputDecoration(
+                hintText: 'Введите название города',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                suffixIcon: IconButton(
+                  icon: const Icon(Icons.search),
+                  onPressed: () => _searchCity(_controller.text.trim()),
+                ),
+              ),
+              onSubmitted: (_) => _searchCity(_controller.text.trim()),
+            ),
+            const SizedBox(height: 16),
+            if (_isSearching)
+              const Center(child: CircularProgressIndicator())
+            else if (_searchResults.isNotEmpty)
+              Container(
+                constraints: const BoxConstraints(maxHeight: 300),
+                child: ListView.builder(
+                  shrinkWrap: true,
+                  itemCount: _searchResults.length,
+                  itemBuilder: (context, index) {
+                    final city = _searchResults[index];
+                    final cityName = city['city'] ?? city['displayName'].split(',').first;
+                    return ListTile(
+                      title: Text(cityName),
+                      onTap: () => _selectCity(city),
+                    );
+                  },
+                ),
+              )
+            else if (_controller.text.isNotEmpty && !_isSearching)
+              const Text(
+                'Город не найден',
+                style: TextStyle(color: Colors.red),
+              ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
+  }
+}

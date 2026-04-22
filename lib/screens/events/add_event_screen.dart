@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vroom/supabase/supabase_config.dart';
+import 'package:vroom/services/geocoding_service.dart';
 
 class AddEventScreen extends StatefulWidget {
   const AddEventScreen({Key? key}) : super(key: key);
@@ -14,6 +15,7 @@ class _AddEventScreenState extends State<AddEventScreen> {
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
   final _maxParticipantsController = TextEditingController();
+
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isLoading = false;
@@ -25,6 +27,53 @@ class _AddEventScreenState extends State<AddEventScreen> {
     'Благотворительность',
     'Другое'
   ];
+
+  double? _latitude;
+  double? _longitude;
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _locationController.dispose();
+    _maxParticipantsController.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _geocodeAddress() async {
+    final address = _locationController.text.trim();
+    if (address.isEmpty) {
+      _latitude = null;
+      _longitude = null;
+      return true; 
+    }
+
+    try {
+      final result = await GeocodingService.geocodeCity(address);
+      if (result != null) {
+        _latitude = result['lat'];
+        _longitude = result['lon'];
+        return true;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Не удалось определить координаты по адресу. Проверьте правильность написания.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return false;
+      }
+    } catch (e) {
+      print('Geocoding error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка геокодирования: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
+  }
 
   Future<void> _addEvent() async {
     if (_titleController.text.isEmpty || _selectedDate == null) {
@@ -39,6 +88,13 @@ class _AddEventScreenState extends State<AddEventScreen> {
     }
 
     setState(() => _isLoading = true);
+
+    final geocodeSuccess = await _geocodeAddress();
+    if (!geocodeSuccess) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
       final userId = SupabaseConfig.auth.currentUser?.id;
       if (userId == null) return;
@@ -64,6 +120,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
         'max_participants': _maxParticipantsController.text.isNotEmpty
             ? int.parse(_maxParticipantsController.text)
             : null,
+        'latitude': _latitude,
+        'longitude': _longitude,
       });
 
       if (!mounted) return;
@@ -126,15 +184,12 @@ class _AddEventScreenState extends State<AddEventScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            // Заголовок
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
                 labelText: 'Название мероприятия*',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -142,16 +197,12 @@ class _AddEventScreenState extends State<AddEventScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Описание
             TextField(
               controller: _descriptionController,
               decoration: InputDecoration(
                 labelText: 'Описание',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -161,16 +212,12 @@ class _AddEventScreenState extends State<AddEventScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-
-            // Категория
             DropdownButtonFormField<String>(
               value: _selectedCategory,
               decoration: InputDecoration(
                 labelText: 'Категория',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -182,15 +229,9 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   child: Text(category),
                 );
               }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCategory = value;
-                });
-              },
+              onChanged: (value) => setState(() => _selectedCategory = value),
             ),
             const SizedBox(height: 16),
-
-            // Дата и время
             Row(
               children: [
                 Expanded(
@@ -235,16 +276,12 @@ class _AddEventScreenState extends State<AddEventScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Место
             TextField(
               controller: _locationController,
               decoration: InputDecoration(
                 labelText: 'Место проведения',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -252,16 +289,12 @@ class _AddEventScreenState extends State<AddEventScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Макс. участников
             TextField(
               controller: _maxParticipantsController,
               decoration: InputDecoration(
                 labelText: 'Макс. участников (оставьте пустым для неограниченного)',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -270,14 +303,8 @@ class _AddEventScreenState extends State<AddEventScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 20),
-
-            // Кнопка создания
             if (_isLoading)
-              const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.blueAccent,
-                ),
-              )
+              const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
             else
               ElevatedButton(
                 onPressed: _addEvent,
@@ -285,16 +312,11 @@ class _AddEventScreenState extends State<AddEventScreen> {
                   backgroundColor: Colors.blueAccent,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Создать мероприятие',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
           ],

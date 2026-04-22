@@ -4,7 +4,7 @@ class NotificationModel {
   final int id;
   final String userId;
   final String actorId;
-  final String type; // 'follow', 'like', 'comment'
+  final String type; 
   final int? postId;
   final int? commentId;
   final String message;

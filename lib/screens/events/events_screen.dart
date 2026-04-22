@@ -70,19 +70,16 @@ class _EventsScreenState extends State<EventsScreen> {
   void _applyFilters() {
     List<Map<String, dynamic>> filtered = List.from(_events);
     
-    // Фильтр по дате - показываем только будущие мероприятия
     final now = DateTime.now();
     filtered = filtered.where((event) {
       final eventDate = DateTime.parse(event['event_date']);
       return eventDate.isAfter(now) || eventDate.isAtSameMomentAs(now);
     }).toList();
     
-    // Фильтр по записи
     if (_showOnlyRegistered) {
       filtered = filtered.where((event) => _registeredEvents.contains(event['id'])).toList();
     }
     
-    // Фильтр по категории
     if (_selectedCategory != 'Все') {
       filtered = filtered.where((event) {
         final category = event['category'] ?? '';
@@ -264,7 +261,6 @@ class _EventsScreenState extends State<EventsScreen> {
                   ),
                   const SizedBox(height: 20),
                   
-                  // Категории
                   const Text(
                     'Категория',
                     style: TextStyle(
@@ -301,7 +297,6 @@ class _EventsScreenState extends State<EventsScreen> {
                   
                   const SizedBox(height: 20),
                   
-                  // Переключатель "Только записанные"
                   SwitchListTile(
                     title: const Text(
                       'Только записанные',
@@ -318,7 +313,6 @@ class _EventsScreenState extends State<EventsScreen> {
                   
                   const SizedBox(height: 20),
                   
-                  // Кнопки действий
                   Row(
                     children: [
                       Expanded(
@@ -444,7 +438,6 @@ class _EventsScreenState extends State<EventsScreen> {
               color: Colors.blueAccent,
               child: Column(
                 children: [
-                  // Индикаторы активных фильтров
                   if (hasActiveFilters)
                     Container(
                       color: Colors.grey[50],
@@ -590,7 +583,6 @@ class _EventsScreenState extends State<EventsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Заголовок с иконкой категории
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
@@ -674,13 +666,11 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
           ),
 
-          // Основное содержимое
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Дата и время
                 Row(
                   children: [
                     Icon(
@@ -697,7 +687,6 @@ class _EventsScreenState extends State<EventsScreen> {
                       ),
                     ),
                     const Spacer(),
-                    // Индикатор скорого мероприятия
                     if (daysUntilEvent <= 7 && daysUntilEvent >= 0)
                       Container(
                         padding: const EdgeInsets.symmetric(
@@ -722,7 +711,6 @@ class _EventsScreenState extends State<EventsScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // Место
                 if (event['location'] != null && event['location'].isNotEmpty)
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -745,7 +733,6 @@ class _EventsScreenState extends State<EventsScreen> {
                     ],
                   ),
 
-                // Описание
                 if (event['description'] != null && event['description'].isNotEmpty)
                   Padding(
                     padding: const EdgeInsets.only(top: 12.0),
@@ -758,7 +745,6 @@ class _EventsScreenState extends State<EventsScreen> {
                     ),
                   ),
 
-                // Организатор (только username)
                 if (event['profiles'] != null)
                   Padding(
                     padding: const EdgeInsets.only(top: 16.0),
@@ -790,7 +776,7 @@ class _EventsScreenState extends State<EventsScreen> {
                               ),
                             ),
                             Text(
-                              '@${event['profiles']?['username'] ?? 'Неизвестен'}', // Добавляем @ перед username
+                              '@${event['profiles']?['username'] ?? 'Неизвестен'}', 
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: Colors.black87,
@@ -806,7 +792,6 @@ class _EventsScreenState extends State<EventsScreen> {
             ),
           ),
 
-          // Кнопка записи или статус участия
           Container(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: currentUserId == null

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vroom/supabase/supabase_config.dart';
+import 'package:vroom/services/geocoding_service.dart';
 
 class EditEventScreen extends StatefulWidget {
   final Map<String, dynamic> event;
@@ -16,6 +17,7 @@ class _EditEventScreenState extends State<EditEventScreen> {
   final _descriptionController = TextEditingController();
   final _locationController = TextEditingController();
   final _maxParticipantsController = TextEditingController();
+
   DateTime? _selectedDate;
   TimeOfDay? _selectedTime;
   bool _isLoading = false;
@@ -28,6 +30,10 @@ class _EditEventScreenState extends State<EditEventScreen> {
     'Другое'
   ];
 
+  double? _latitude;
+  double? _longitude;
+  String _originalAddress = '';
+
   @override
   void initState() {
     super.initState();
@@ -35,7 +41,14 @@ class _EditEventScreenState extends State<EditEventScreen> {
     _descriptionController.text = widget.event['description'] ?? '';
     _locationController.text = widget.event['location'] ?? '';
     _selectedCategory = widget.event['category'];
-    
+    _originalAddress = _locationController.text;
+
+    if (widget.event['latitude'] != null) {
+      _latitude = widget.event['latitude'].toDouble();
+    }
+    if (widget.event['longitude'] != null) {
+      _longitude = widget.event['longitude'].toDouble();
+    }
     if (widget.event['max_participants'] != null) {
       _maxParticipantsController.text = widget.event['max_participants'].toString();
     }
@@ -43,6 +56,54 @@ class _EditEventScreenState extends State<EditEventScreen> {
     final eventDate = DateTime.parse(widget.event['event_date']);
     _selectedDate = eventDate;
     _selectedTime = TimeOfDay.fromDateTime(eventDate);
+  }
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descriptionController.dispose();
+    _locationController.dispose();
+    _maxParticipantsController.dispose();
+    super.dispose();
+  }
+
+  Future<bool> _geocodeAddress() async {
+    final address = _locationController.text.trim();
+    if (address.isEmpty) {
+      _latitude = null;
+      _longitude = null;
+      return true; 
+    }
+
+    if (address == _originalAddress && (_latitude != null && _longitude != null)) {
+      return true;
+    }
+
+    try {
+      final result = await GeocodingService.geocodeCity(address);
+      if (result != null) {
+        _latitude = result['lat'];
+        _longitude = result['lon'];
+        return true;
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Не удалось определить координаты по адресу. Проверьте правильность написания.'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+        return false;
+      }
+    } catch (e) {
+      print('Geocoding error: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Ошибка геокодирования: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return false;
+    }
   }
 
   Future<void> _updateEvent() async {
@@ -58,6 +119,13 @@ class _EditEventScreenState extends State<EditEventScreen> {
     }
 
     setState(() => _isLoading = true);
+
+    final geocodeSuccess = await _geocodeAddress();
+    if (!geocodeSuccess) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
     try {
       DateTime eventDate = _selectedDate!;
       if (_selectedTime != null) {
@@ -79,6 +147,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
         'max_participants': _maxParticipantsController.text.isNotEmpty
             ? int.parse(_maxParticipantsController.text)
             : null,
+        'latitude': _latitude,
+        'longitude': _longitude,
       }).eq('id', widget.event['id']);
 
       if (!mounted) return;
@@ -141,15 +211,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
         padding: const EdgeInsets.all(16.0),
         child: ListView(
           children: [
-            // Заголовок
             TextField(
               controller: _titleController,
               decoration: InputDecoration(
                 labelText: 'Название мероприятия*',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -157,16 +224,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Описание
             TextField(
               controller: _descriptionController,
               decoration: InputDecoration(
                 labelText: 'Описание',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -176,16 +239,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
               maxLines: 3,
             ),
             const SizedBox(height: 16),
-
-            // Категория
             DropdownButtonFormField<String>(
               value: _selectedCategory,
               decoration: InputDecoration(
                 labelText: 'Категория',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -197,15 +256,9 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   child: Text(category),
                 );
               }).toList(),
-              onChanged: (value) {
-                setState(() {
-                  _selectedCategory = value;
-                });
-              },
+              onChanged: (value) => setState(() => _selectedCategory = value),
             ),
             const SizedBox(height: 16),
-
-            // Дата и время
             Row(
               children: [
                 Expanded(
@@ -250,16 +303,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // Место
             TextField(
               controller: _locationController,
               decoration: InputDecoration(
                 labelText: 'Место проведения',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -267,16 +316,12 @@ class _EditEventScreenState extends State<EditEventScreen> {
               ),
             ),
             const SizedBox(height: 16),
-
-            // Макс. участников
             TextField(
               controller: _maxParticipantsController,
               decoration: InputDecoration(
                 labelText: 'Макс. участников (оставьте пустым для неограниченного)',
                 labelStyle: const TextStyle(color: Colors.grey),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: const BorderSide(color: Colors.blueAccent),
@@ -285,14 +330,8 @@ class _EditEventScreenState extends State<EditEventScreen> {
               keyboardType: TextInputType.number,
             ),
             const SizedBox(height: 20),
-
-            // Кнопка сохранения
             if (_isLoading)
-              const Center(
-                child: CircularProgressIndicator(
-                  color: Colors.blueAccent,
-                ),
-              )
+              const Center(child: CircularProgressIndicator(color: Colors.blueAccent))
             else
               ElevatedButton(
                 onPressed: _updateEvent,
@@ -300,16 +339,11 @@ class _EditEventScreenState extends State<EditEventScreen> {
                   backgroundColor: Colors.blueAccent,
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 50),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 ),
                 child: const Text(
                   'Сохранить изменения',
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                 ),
               ),
           ],

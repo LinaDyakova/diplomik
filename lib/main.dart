@@ -9,11 +9,11 @@ import 'package:vroom/screens/post/post_detail_screen.dart';
 import 'package:vroom/supabase/supabase_config.dart';
 import 'package:vroom/screens/profile/other_profile_screen.dart';
 import 'package:vroom/screens/notifications/notifications_screen.dart';
-
+import 'package:vroom/screens/map/map_screen.dart';
+import 'package:vroom/screens/events/event_detail_screen.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Инициализация Supabase
   await SupabaseConfig.initialize();
   
   runApp(const MyApp());
@@ -47,6 +47,10 @@ class MyApp extends StatelessWidget {
         '/other_profile': (context) {
           final userId = ModalRoute.of(context)!.settings.arguments as String;
           return OtherProfileScreen(userId: userId);
+        },
+        '/event_detail': (context) {
+          final eventId = ModalRoute.of(context)!.settings.arguments as int;
+          return EventDetailScreen(eventId: eventId);
         },
       },
     );
@@ -83,6 +87,7 @@ class _MainTabScreenState extends State<MainTabScreen> {
     const EventsScreen(),
     const ChatsListScreen(),
     const ProfileScreen(),
+    const MapScreen(),
   ];
 
   @override
@@ -131,6 +136,11 @@ class _MainTabScreenState extends State<MainTabScreen> {
                 icon: Icon(Icons.person_outlined),
                 activeIcon: Icon(Icons.person),
                 label: 'Профиль',
+              ),
+              BottomNavigationBarItem(
+                icon: Icon(Icons.map_outlined),
+                activeIcon: Icon(Icons.map),
+                label: 'Карта',
               ),
             ],
           ),

@@ -29,7 +29,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.initState();
     _loadPostDetails();
     _checkIfLiked();
-    // Инициализируем timeago с русской локалью
     timeago.setLocaleMessages('ru', timeago.RuMessages());
   }
 
@@ -42,7 +41,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   Future<void> _loadPostDetails() async {
     try {
-      // Загружаем детали поста
       final postResponse = await SupabaseConfig.client
           .from('posts')
           .select('''
@@ -54,7 +52,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           .eq('id', widget.postId)
           .single();
 
-      // Загружаем комментарии
       final commentsResponse = await SupabaseConfig.client
           .from('comments')
           .select('''
@@ -108,14 +105,12 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
     try {
       if (_isLiked) {
-        // Удаляем лайк
         await SupabaseConfig.client
             .from('likes')
             .delete()
             .eq('user_id', userId)
             .eq('post_id', widget.postId);
       } else {
-        // Добавляем лайк
         await SupabaseConfig.client.from('likes').insert({
           'user_id': userId,
           'post_id': widget.postId,
@@ -124,7 +119,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       setState(() {
         _isLiked = !_isLiked;
-        // Обновляем количество лайков
         if (_post != null) {
           final currentCount = _post!['likes'][0]['count'] ?? 0;
           _post!['likes'][0]['count'] = _isLiked ? currentCount + 1 : currentCount - 1;
@@ -173,7 +167,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     print('Попытка добавить комментарий: "$commentText" к посту ${widget.postId} пользователем $userId');
 
     try {
-      // Добавляем комментарий
       await SupabaseConfig.client
           .from('comments')
           .insert({
@@ -184,13 +177,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       print('Комментарий успешно добавлен!');
 
-      // Очищаем поле ввода
       _commentController.clear();
       
-      // Обновляем данные
       await _loadPostDetails();
       
-      // Прокручиваем к последнему комментарию
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -201,7 +191,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         }
       });
       
-      // Показываем уведомление
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Комментарий добавлен'),
@@ -213,7 +202,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       print('Ошибка добавления комментария: $e');
       print('Полная информация об ошибке: ${e.toString()}');
       
-      // Показываем подробное сообщение об ошибке
       String errorMessage = 'Неизвестная ошибка';
       if (e is PostgrestException) {
         errorMessage = 'Ошибка базы данных: ${e.message}';
@@ -242,7 +230,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     if (userId == null) return;
 
     try {
-      // Показываем диалог редактирования
       await showDialog(
         context: context,
         builder: (context) => EditPostDialog(
@@ -326,12 +313,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     }
   }
 
-  // Функция для открытия профиля пользователя
   void _openUserProfile(String userId) {
     final currentUserId = SupabaseConfig.auth.currentUser?.id;
     
     if (currentUserId == userId) {
-      // Если это профиль текущего пользователя
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -339,7 +324,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
         ),
       );
     } else {
-      // Если это профиль другого пользователя
       Navigator.push(
         context,
         MaterialPageRoute(
@@ -412,22 +396,18 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       child: CustomScrollView(
                         controller: _scrollController,
                         slivers: [
-                          // Заголовок поста
                           SliverToBoxAdapter(
                             child: _buildPostHeader(),
                           ),
                           
-                          // Контент поста
                           SliverToBoxAdapter(
                             child: _buildPostContent(),
                           ),
                           
-                          // Статистика
                           SliverToBoxAdapter(
                             child: _buildPostStats(),
                           ),
                           
-                          // Комментарии
                           SliverPadding(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
                             sliver: SliverList(
@@ -485,7 +465,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       ),
                     ),
                     
-                    // Поле для комментария
                     _buildCommentInput(),
                   ],
                 ),
@@ -503,7 +482,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(
         children: [
-          // Аватар - кликабельный
           GestureDetector(
             onTap: () => _openUserProfile(_post!['user_id']),
             child: CircleAvatar(
@@ -522,7 +500,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
           const SizedBox(width: 12),
           
-          // Информация о пользователе - кликабельная
           Expanded(
             child: GestureDetector(
               onTap: () => _openUserProfile(_post!['user_id']),
@@ -549,7 +526,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
           
-          // Меню действий
           if (isCreator)
             IconButton(
               onPressed: () {
@@ -628,7 +604,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Текст поста
         if (post['content'] != null && post['content'].isNotEmpty)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -642,7 +617,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             ),
           ),
         
-        // Изображение поста
         if (post['photo_url'] != null)
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -810,7 +784,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Аватар комментатора - кликабельный
           GestureDetector(
             onTap: () => _openUserProfile(comment['user_id']),
             child: CircleAvatar(
@@ -830,7 +803,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
           ),
           const SizedBox(width: 12),
           
-          // Контент комментария
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -846,7 +818,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                     children: [
                       Row(
                         children: [
-                          // Имя пользователя - кликабельное
                           GestureDetector(
                             onTap: () => _openUserProfile(comment['user_id']),
                             child: Text(

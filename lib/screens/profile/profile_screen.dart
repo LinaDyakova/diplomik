@@ -34,7 +34,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
   if (userId == null) return;
 
   try {
-    // Загружаем профиль
     final profileResponse = await SupabaseConfig.client
         .from('profiles')
         .select()
@@ -43,14 +42,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     print('Загружен профиль: $profileResponse');
 
-    // Загружаем посты пользователя
     final postsResponse = await SupabaseConfig.client
         .from('posts')
         .select('*, likes(count), comments(count)')
         .eq('user_id', userId)
         .order('created_at', ascending: false);
 
-    // Загружаем статистику профиля через RPC-функцию
     final statsResponse = await SupabaseConfig.client
         .rpc('get_profile_stats', params: {'user_id': userId});
 
@@ -66,7 +63,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
       
       print('Статистика профиля: $stats');
     } else {
-      // Если RPC не работает, используем старый метод
       final followersResponse = await SupabaseConfig.client
           .from('follows')
           .select('id')
@@ -228,7 +224,6 @@ void _openFollowingList() {
     ),
   ),
   actions: [
-  // Кнопка добавления поста
 IconButton(
   onPressed: _addPost,
   icon: const Icon(Icons.add_photo_alternate_outlined),
@@ -236,7 +231,6 @@ IconButton(
   tooltip: 'Добавить пост',
 ),
     
-    // Иконка уведомлений
     Stack(
       children: [
         IconButton(
@@ -247,7 +241,6 @@ IconButton(
                 builder: (context) => const NotificationsScreen(),
               ),
             ).then((_) {
-              // При возврате обновляем счетчик
               _loadUnreadNotificationsCount();
             });
           },
@@ -283,7 +276,6 @@ IconButton(
           ),
       ],
     ),
-    // Иконка выхода
     IconButton(
       onPressed: _logout,
       icon: const Icon(Icons.logout_outlined),
@@ -298,13 +290,10 @@ IconButton(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Шапка профиля
               _buildProfileHeader(),
               
-              // Статистика
               _buildStatsSection(),
               
-              // Сетка постов
               _buildPostsGrid(),
             ],
           ),
@@ -321,7 +310,6 @@ IconButton(
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Аватар
           Container(
             width: 80,
             height: 80,
@@ -352,7 +340,6 @@ IconButton(
           
           const SizedBox(width: 20),
           
-          // Информация о пользователе
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -376,7 +363,6 @@ IconButton(
                 
                 const SizedBox(height: 16),
                 
-                // Кнопка редактирования
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton(
@@ -431,7 +417,6 @@ Widget _buildStatsSection() {
           ],
         ),
         
-        // Подписчики - кликабельные
         GestureDetector(
           onTap: _openFollowersList,
           child: Column(
@@ -455,7 +440,6 @@ Widget _buildStatsSection() {
           ),
         ),
         
-        // Подписки - кликабельные
         GestureDetector(
           onTap: _openFollowingList,
           child: Column(
@@ -522,15 +506,15 @@ Widget _buildStatsSection() {
 
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.all(4.0), // Уменьшили padding
+      padding: const EdgeInsets.all(4.0), 
       child: GridView.builder(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
           crossAxisCount: 3,
-          crossAxisSpacing: 2.0, // Уменьшили отступы между элементами
-          mainAxisSpacing: 2.0, // Уменьшили отступы между элементами
-          childAspectRatio: 1.0, // Сделали квадратные карточки
+          crossAxisSpacing: 2.0, 
+          mainAxisSpacing: 2.0, 
+          childAspectRatio: 1.0, 
         ),
         itemCount: _posts.length,
         itemBuilder: (context, index) {
@@ -579,7 +563,7 @@ Widget _buildStatsSection() {
                       child: Icon(
                         Icons.photo_outlined,
                         color: Colors.grey,
-                        size: 24, // Уменьшили размер иконки
+                        size: 24, 
                       ),
                     ),
                   );
@@ -591,7 +575,7 @@ Widget _buildStatsSection() {
                   child: Icon(
                     Icons.photo_outlined,
                     color: Colors.grey,
-                    size: 24, // Уменьшили размер иконки
+                    size: 24, 
                   ),
                 ),
               ),
@@ -600,7 +584,6 @@ Widget _buildStatsSection() {
   }
 }
 
-// Обновленный UpdateProfileDialog
 class UpdateProfileDialog extends StatefulWidget {
   final Map<String, dynamic> profile;
   final VoidCallback onUpdated;
@@ -659,7 +642,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
           ),
           child: Stack(
             children: [
-              // Текущая или новая аватарка
               if (_image != null)
                 kIsWeb && _imageBytes != null
                     ? CircleAvatar(
@@ -686,7 +668,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
                   ),
                 ),
               
-              // Индикатор загрузки
               if (_isUploadingImage)
                 Positioned.fill(
                   child: Container(
@@ -726,7 +707,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
       final fileExtension = _image!.name.split('.').last;
       final fileName = 'avatar_${userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExtension';
       
-      // Удаляем старую аватарку, если она есть
       if (widget.profile['avatar_url'] != null) {
         try {
           final oldFileName = widget.profile['avatar_url'].split('/').last;
@@ -738,7 +718,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
         }
       }
       
-      // Загружаем новую аватарку
       if (kIsWeb) {
         if (_imageBytes != null) {
           await SupabaseConfig.client.storage
@@ -752,7 +731,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
             .upload(fileName, file);
       }
       
-      // Получаем публичный URL
       final publicUrl = SupabaseConfig.client.storage
           .from('avatars')
           .getPublicUrl(fileName);
@@ -784,12 +762,10 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
     try {
       String? newAvatarUrl;
       
-      // Загружаем аватарку, если выбрана новая
       if (_image != null) {
         newAvatarUrl = await _uploadAvatar();
       }
       
-      // Обновляем профиль в базе данных
       final updateData = {
         'id': widget.profile['id'],
         'username': _usernameController.text.trim(),
@@ -856,11 +832,9 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
               ),
               const SizedBox(height: 20),
               
-              // Аватар
               _buildAvatarPreview(),
               const SizedBox(height: 20),
               
-              // Поле username
               TextField(
                 controller: _usernameController,
                 decoration: InputDecoration(
@@ -875,7 +849,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
               ),
               const SizedBox(height: 16),
               
-              // Поле биографии
               TextField(
                 controller: _bioController,
                 decoration: InputDecoration(
@@ -893,7 +866,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
               ),
               const SizedBox(height: 24),
               
-              // Кнопки
               Row(
                 mainAxisAlignment: MainAxisAlignment.end,
                 children: [
@@ -931,7 +903,6 @@ class _UpdateProfileDialogState extends State<UpdateProfileDialog> {
   }
 }
 
-// Обновленный AddPostDialog (используем car-photos вместо post-photos)
 class AddPostDialog extends StatefulWidget {
   final VoidCallback onAdded;
 
@@ -965,7 +936,6 @@ class _AddPostDialogState extends State<AddPostDialog> {
           _imageSelected = true;
         });
         
-        // Для веб-версии читаем байты изображения
         if (kIsWeb) {
           final bytes = await image.readAsBytes();
           setState(() {
@@ -1167,18 +1137,16 @@ class _AddPostDialogState extends State<AddPostDialog> {
     setState(() => _isLoading = true);
 
     try {
-      // Генерируем уникальное имя файла
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileExtension = _image!.name.split('.').last.toLowerCase();
       final fileName = 'post_${userId}_$timestamp.$fileExtension';
 
       print('Начинаю загрузку изображения: $fileName');
 
-      // Загружаем изображение в Storage (car-photos вместо post-photos)
       if (kIsWeb) {
         if (_imageBytes != null) {
           await SupabaseConfig.client.storage
-              .from('car-photos') // ИЗМЕНЕНО: post-photos → car-photos
+              .from('car-photos') 
               .uploadBinary(fileName, _imageBytes!);
         } else {
           throw Exception('Изображение не загружено для веб-версии');
@@ -1186,18 +1154,16 @@ class _AddPostDialogState extends State<AddPostDialog> {
       } else {
         final file = File(_image!.path);
         await SupabaseConfig.client.storage
-            .from('car-photos') // ИЗМЕНЕНО: post-photos → car-photos
+            .from('car-photos') 
             .upload(fileName, file);
       }
 
-      // Получаем публичный URL
       final publicUrl = SupabaseConfig.client.storage
-          .from('car-photos') // ИЗМЕНЕНО: post-photos → car-photos
+          .from('car-photos') 
           .getPublicUrl(fileName);
 
       print('Изображение загружено. URL: $publicUrl');
 
-      // Создаем запись о посте в базе данных
       final postData = {
         'user_id': userId,
         'content': _contentController.text.trim(),
@@ -1267,11 +1233,9 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 ),
                 const SizedBox(height: 20),
                 
-                // Изображение
                 _buildImagePreview(),
                 const SizedBox(height: 16),
                 
-                // Описание
                 TextField(
                   controller: _contentController,
                   decoration: InputDecoration(
@@ -1290,7 +1254,6 @@ class _AddPostDialogState extends State<AddPostDialog> {
                 
                 const SizedBox(height: 24),
                 
-                // Кнопки
                 Row(
                   mainAxisAlignment: MainAxisAlignment.end,
                   children: [
