@@ -32,14 +32,22 @@ class _ServiceFilterSheetState extends State<ServiceFilterSheet> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Фильтр сервисов', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+          const Text('Фильтр сервисов', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87)),
           const SizedBox(height: 16),
           Wrap(
             spacing: 8,
             children: _types.map((type) {
               return FilterChip(
-                label: Text(type['label']!),
+                label: Text(
+                  type['label']!,
+                  style: TextStyle(
+                    color: _selectedType == type['value'] ? Colors.white : Colors.black87,
+                  ),
+                ),
                 selected: _selectedType == type['value'],
+                selectedColor: Colors.black87,
+                checkmarkColor: Colors.white,
+                backgroundColor: Colors.grey[200],
                 onSelected: (selected) {
                   setState(() {
                     _selectedType = type['value']!;
@@ -54,7 +62,7 @@ class _ServiceFilterSheetState extends State<ServiceFilterSheet> {
             children: [
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text('Отмена'),
+                child: const Text('Отмена', style: TextStyle(color: Colors.black87)),
               ),
               const SizedBox(width: 12),
               ElevatedButton(
@@ -63,6 +71,12 @@ class _ServiceFilterSheetState extends State<ServiceFilterSheet> {
                   widget.onFilterChanged(newType);
                   Navigator.pop(context);
                 },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.black87,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  elevation: 0,
+                ),
                 child: const Text('Применить'),
               ),
             ],

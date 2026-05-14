@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:intl/date_symbol_data_local.dart';
 import 'package:vroom/screens/auth/sign_in_screen.dart';
 import 'package:vroom/screens/chat/chats_list_screen.dart';
 import 'package:vroom/screens/home/main_feed_screen.dart';
@@ -11,11 +12,12 @@ import 'package:vroom/screens/profile/other_profile_screen.dart';
 import 'package:vroom/screens/notifications/notifications_screen.dart';
 import 'package:vroom/screens/map/map_screen.dart';
 import 'package:vroom/screens/events/event_detail_screen.dart';
-void main() async {
+import 'package:vroom/screens/welcome_screen.dart';
+
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+  await initializeDateFormatting('ru', null);
   await SupabaseConfig.initialize();
-  
   runApp(const MyApp());
 }
 
@@ -26,14 +28,66 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'VROOM',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        primarySwatch: Colors.blue,
+        primarySwatch: Colors.grey,
         visualDensity: VisualDensity.adaptivePlatformDensity,
-        scaffoldBackgroundColor: Colors.grey[100],
+        scaffoldBackgroundColor: Colors.white,
+        appBarTheme: const AppBarTheme(
+          backgroundColor: Colors.white,
+          elevation: 0.5,
+          iconTheme: IconThemeData(color: Colors.black87),
+          titleTextStyle: TextStyle(
+            color: Colors.black87,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        // Нижняя панель без подписей — иконки по центру
+        bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+          backgroundColor: Colors.white,
+          selectedItemColor: Colors.black87,
+          unselectedItemColor: Colors.grey,
+          showSelectedLabels: false,
+          showUnselectedLabels: false,
+          type: BottomNavigationBarType.fixed,
+          elevation: 0,
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.black87,
+            foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 0,
+          ),
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: Colors.grey[100],
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: BorderSide(color: Colors.grey[300]!),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(12),
+            borderSide: const BorderSide(color: Colors.black, width: 1.5),
+          ),
+          contentPadding:
+              const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        ),
+        colorScheme: ColorScheme.fromSwatch().copyWith(
+          secondary: Colors.black87,
+        ),
       ),
-      initialRoute: '/',
+      initialRoute: '/welcome',
       routes: {
-        '/': (context) => const AuthWrapper(),
+        '/welcome': (context) => const WelcomeScreen(),
         '/signin': (context) => const SignInScreen(),
         '/home': (context) => const MainTabScreen(),
         '/events': (context) => const EventsScreen(),
@@ -57,21 +111,6 @@ class MyApp extends StatelessWidget {
   }
 }
 
-class AuthWrapper extends StatelessWidget {
-  const AuthWrapper({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    final session = SupabaseConfig.auth.currentSession;
-    
-    if (session != null) {
-      return const MainTabScreen();
-    } else {
-      return const SignInScreen();
-    }
-  }
-}
-
 class MainTabScreen extends StatefulWidget {
   const MainTabScreen({Key? key}) : super(key: key);
 
@@ -82,25 +121,25 @@ class MainTabScreen extends StatefulWidget {
 class _MainTabScreenState extends State<MainTabScreen> {
   int _selectedIndex = 0;
 
-  final List<Widget> _screens = [
-    const MainFeedScreen(),
-    const EventsScreen(),
-    const ChatsListScreen(),
-    const ProfileScreen(),
-    const MapScreen(),
+  final List<Widget> _screens = const [
+    MainFeedScreen(),
+    EventsScreen(),
+    ChatsListScreen(),
+    ProfileScreen(),
+    MapScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.white,
       body: _screens[_selectedIndex],
       bottomNavigationBar: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
+              color: Colors.grey.withOpacity(0.1),
               blurRadius: 10,
               offset: const Offset(0, -2),
             ),
@@ -108,39 +147,34 @@ class _MainTabScreenState extends State<MainTabScreen> {
         ),
         child: SafeArea(
           child: BottomNavigationBar(
-            backgroundColor: Colors.white,
             currentIndex: _selectedIndex,
             onTap: (index) => setState(() => _selectedIndex = index),
-            selectedItemColor: Colors.blueAccent,
-            unselectedItemColor: Colors.grey[600],
-            selectedLabelStyle: const TextStyle(fontWeight: FontWeight.w600),
-            type: BottomNavigationBarType.fixed,
-            elevation: 0,
+            iconSize: 28,
             items: const [
               BottomNavigationBarItem(
                 icon: Icon(Icons.home_outlined),
                 activeIcon: Icon(Icons.home),
-                label: 'Лента',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.event_outlined),
                 activeIcon: Icon(Icons.event),
-                label: 'Мероприятия',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.chat_outlined),
                 activeIcon: Icon(Icons.chat),
-                label: 'Чаты',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.person_outlined),
                 activeIcon: Icon(Icons.person),
-                label: 'Профиль',
+                label: '',
               ),
               BottomNavigationBarItem(
                 icon: Icon(Icons.map_outlined),
                 activeIcon: Icon(Icons.map),
-                label: 'Карта',
+                label: '',
               ),
             ],
           ),

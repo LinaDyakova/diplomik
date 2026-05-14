@@ -3,7 +3,6 @@ import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vroom/supabase/supabase_config.dart';
 
 class CreateGroupChatScreen extends StatefulWidget {
@@ -15,9 +14,9 @@ class CreateGroupChatScreen extends StatefulWidget {
 
 class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
   final TextEditingController _nameController = TextEditingController();
-  String _chatType = 'group'; 
+  String _chatType = 'group';
   List<String> _selectedParticipants = [];
-  List<Map<String, dynamic>> _friends = []; 
+  List<Map<String, dynamic>> _friends = [];
   bool _isLoading = false;
 
   XFile? _image;
@@ -92,10 +91,10 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
       try {
         final timestamp = DateTime.now().millisecondsSinceEpoch;
         final fileName = 'group_${timestamp}_${timestamp}.jpg';
+        // Убираем FileOptions, чтобы избежать ошибки
         await SupabaseConfig.client.storage
             .from('group-avatars')
-            .uploadBinary(fileName, _imageBytes!,
-                fileOptions: const FileOptions(contentType: 'image/jpeg'));
+            .uploadBinary(fileName, _imageBytes!);
         return SupabaseConfig.client.storage
             .from('group-avatars')
             .getPublicUrl(fileName);
@@ -148,18 +147,15 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
     }
 
     try {
-      final response = await SupabaseConfig.client.rpc('create_group_chat', params: {
+      await SupabaseConfig.client.rpc('create_group_chat', params: {
         'p_creator_id': currentUserId,
         'p_type': _chatType,
         'p_group_name': _nameController.text.trim(),
         'p_group_photo_url': photoUrl,
         'p_participant_ids': _chatType == 'group' ? _selectedParticipants : [],
       });
-      if (response != null) {
-        Navigator.pop(context, true);
-      }
+      Navigator.pop(context, true);
     } catch (e) {
-      print('Error creating chat: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
       );
@@ -183,12 +179,12 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
         actions: [
           TextButton(
             onPressed: _isLoading ? null : _createChat,
-            child: const Text('Создать', style: TextStyle(color: Colors.blueAccent)),
+            child: const Text('Создать', style: TextStyle(color: Colors.black87)),
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Colors.black87))
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Column(
@@ -215,7 +211,7 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
                             child: Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.blueAccent,
+                                color: Colors.black87,
                                 shape: BoxShape.circle,
                               ),
                               child: const Icon(Icons.camera_alt, color: Colors.white, size: 20),
@@ -228,32 +224,96 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
                   const SizedBox(height: 24),
                   TextField(
                     controller: _nameController,
-                    decoration: const InputDecoration(
+                    decoration: InputDecoration(
                       labelText: 'Название',
-                      border: OutlineInputBorder(),
+                      labelStyle: const TextStyle(color: Colors.grey),
+                      filled: true,
+                      fillColor: Colors.grey[100],
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Colors.black87, width: 1.5),
+                      ),
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Тип чата', style: TextStyle(fontWeight: FontWeight.bold)),
+                  const Text('Тип чата', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
                   const SizedBox(height: 8),
-                  SegmentedButton<String>(
-                    segments: const [
-                      ButtonSegment(value: 'group', label: Text('Группа'), icon: Icon(Icons.group)),
-                      ButtonSegment(value: 'channel', label: Text('Канал'), icon: Icon(Icons.mic)),
-                    ],
-                    selected: {_chatType},
-                    onSelectionChanged: (Set<String> selection) {
-                      setState(() {
-                        _chatType = selection.first;
-                      });
-                    },
+                  Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _chatType = 'group'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _chatType == 'group' ? Colors.black87 : Colors.white,
+                                borderRadius: const BorderRadius.only(
+                                  topLeft: Radius.circular(11),
+                                  bottomLeft: Radius.circular(11),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.group, size: 18,
+                                      color: _chatType == 'group' ? Colors.white : Colors.black87),
+                                  const SizedBox(width: 6),
+                                  Text('Группа',
+                                      style: TextStyle(
+                                          color: _chatType == 'group' ? Colors.white : Colors.black87)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _chatType = 'channel'),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _chatType == 'channel' ? Colors.black87 : Colors.white,
+                                borderRadius: const BorderRadius.only(
+                                  topRight: Radius.circular(11),
+                                  bottomRight: Radius.circular(11),
+                                ),
+                              ),
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.mic, size: 18,
+                                      color: _chatType == 'channel' ? Colors.white : Colors.black87),
+                                  const SizedBox(width: 6),
+                                  Text('Канал',
+                                      style: TextStyle(
+                                          color: _chatType == 'channel' ? Colors.white : Colors.black87)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   const SizedBox(height: 24),
                   if (_chatType == 'group')
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text('Участники', style: TextStyle(fontWeight: FontWeight.bold)),
+                        const Text('Участники', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
                         const SizedBox(height: 8),
                         _friends.isEmpty
                             ? const Text('Нет друзей', style: TextStyle(color: Colors.grey))
@@ -265,8 +325,10 @@ class _CreateGroupChatScreenState extends State<CreateGroupChatScreen> {
                                   final user = _friends[index];
                                   final isSelected = _selectedParticipants.contains(user['id']);
                                   return CheckboxListTile(
-                                    title: Text('@${user['username']}'),
+                                    title: Text('@${user['username']}',
+                                        style: const TextStyle(color: Colors.black87)),
                                     value: isSelected,
+                                    activeColor: Colors.black87,
                                     onChanged: (selected) {
                                       setState(() {
                                         if (selected == true) {

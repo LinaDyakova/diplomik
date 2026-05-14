@@ -78,7 +78,7 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
@@ -86,18 +86,30 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
           children: [
             const Text(
               'Выберите ваш город',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87),
             ),
             const SizedBox(height: 16),
             TextField(
               controller: _controller,
               decoration: InputDecoration(
                 hintText: 'Введите название города',
+                hintStyle: TextStyle(color: Colors.grey[400]),
+                filled: true,
+                fillColor: Colors.grey[100],
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: Colors.black87, width: 1.5),
                 ),
                 suffixIcon: IconButton(
-                  icon: const Icon(Icons.search),
+                  icon: const Icon(Icons.search, color: Colors.black87),
                   onPressed: () => _searchCity(_controller.text.trim()),
                 ),
               ),
@@ -105,7 +117,7 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
             ),
             const SizedBox(height: 16),
             if (_isSearching)
-              const Center(child: CircularProgressIndicator())
+              const Center(child: CircularProgressIndicator(color: Colors.black87))
             else if (_searchResults.isNotEmpty)
               Container(
                 constraints: const BoxConstraints(maxHeight: 300),
@@ -116,7 +128,7 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
                     final city = _searchResults[index];
                     final cityName = city['city'] ?? city['displayName'].split(',').first;
                     return ListTile(
-                      title: Text(cityName),
+                      title: Text(cityName, style: const TextStyle(color: Colors.black87)),
                       onTap: () => _selectCity(city),
                     );
                   },

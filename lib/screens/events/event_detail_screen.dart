@@ -95,7 +95,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         _participantsCount++;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Вы записались на мероприятие'), backgroundColor: Colors.green),
+        const SnackBar(
+            content: Text('Вы записались на мероприятие'),
+            backgroundColor: Colors.green),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -118,7 +120,9 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
         _participantsCount--;
       });
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Вы отписались от мероприятия'), backgroundColor: Colors.orange),
+        const SnackBar(
+            content: Text('Вы отписались от мероприятия'),
+            backgroundColor: Colors.orange),
       );
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -159,26 +163,31 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
   Widget build(BuildContext context) {
     if (_isLoading) {
       return Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(title: const Text('Мероприятие')),
-        body: const Center(child: CircularProgressIndicator()),
+        body: const Center(
+            child: CircularProgressIndicator(color: Colors.black87)),
       );
     }
     if (_event == null) {
       return Scaffold(
+        backgroundColor: Colors.white,
         appBar: AppBar(title: const Text('Мероприятие')),
         body: const Center(child: Text('Мероприятие не найдено')),
       );
     }
     final eventDate = DateTime.parse(_event!['event_date']);
     final formattedDate = _formatDate(eventDate);
-    final isCreator = SupabaseConfig.auth.currentUser?.id == _event!['creator_id'];
+    final isCreator =
+        SupabaseConfig.auth.currentUser?.id == _event!['creator_id'];
 
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: Text(_event!['title']),
+        title: Text(_event!['title'],
+            style: const TextStyle(color: Colors.black87)),
         iconTheme: const IconThemeData(color: Colors.black87),
       ),
       body: SingleChildScrollView(
@@ -189,45 +198,62 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             Row(
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.blueAccent.withOpacity(0.1),
+                    color: Colors.black87,
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
                     _event!['category'] ?? 'Мероприятие',
-                    style: const TextStyle(color: Colors.blueAccent),
+                    style: const TextStyle(color: Colors.white, fontSize: 13),
                   ),
                 ),
                 const Spacer(),
                 Text(
                   formattedDate,
-                  style: const TextStyle(color: Colors.grey),
+                  style: TextStyle(color: Colors.grey[700]),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            if (_event!['description'] != null && _event!['description'].isNotEmpty)
+            if (_event!['description'] != null &&
+                _event!['description'].isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Описание', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Описание',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87)),
                   const SizedBox(height: 8),
-                  Text(_event!['description']),
+                  Text(_event!['description'],
+                      style: const TextStyle(
+                          fontSize: 15, color: Colors.black87)),
                   const SizedBox(height: 16),
                 ],
               ),
-            if (_event!['location'] != null && _event!['location'].isNotEmpty)
+            if (_event!['location'] != null &&
+                _event!['location'].isNotEmpty)
               Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Место', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                  const Text('Место',
+                      style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.black87)),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      const Icon(Icons.location_on, color: Colors.grey),
+                      const Icon(Icons.location_on,
+                          color: Colors.grey, size: 20),
                       const SizedBox(width: 8),
-                      Expanded(child: Text(_event!['location'])),
+                      Expanded(
+                          child: Text(_event!['location'],
+                              style: const TextStyle(
+                                  fontSize: 15, color: Colors.black87))),
                     ],
                   ),
                   const SizedBox(height: 16),
@@ -236,24 +262,36 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Участники', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Участники',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87)),
                 const SizedBox(height: 8),
-                Text('$_participantsCount чел.'),
+                Text('$_participantsCount чел.',
+                    style:
+                        const TextStyle(fontSize: 16, color: Colors.black87)),
                 const SizedBox(height: 16),
               ],
             ),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Организатор', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                const Text('Организатор',
+                    style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.black87)),
                 const SizedBox(height: 8),
                 Row(
                   children: [
                     CircleAvatar(
                       radius: 20,
-                      backgroundImage: _event!['profiles']?['avatar_url'] != null
-                          ? NetworkImage(_event!['profiles']['avatar_url'])
-                          : null,
+                      backgroundColor: Colors.grey[200],
+                      backgroundImage:
+                          _event!['profiles']?['avatar_url'] != null
+                              ? NetworkImage(_event!['profiles']['avatar_url'])
+                              : null,
                       child: _event!['profiles']?['avatar_url'] == null
                           ? const Icon(Icons.person, size: 20)
                           : null,
@@ -261,7 +299,10 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                     const SizedBox(width: 12),
                     Text(
                       '@${_event!['profiles']?['username'] ?? 'Пользователь'}',
-                      style: const TextStyle(fontWeight: FontWeight.w500),
+                      style: const TextStyle(
+                          fontWeight: FontWeight.w500,
+                          color: Colors.black87,
+                          fontSize: 16),
                     ),
                   ],
                 ),
@@ -272,14 +313,22 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: _isRegistered ? _unregisterFromEvent : _registerForEvent,
+                  onPressed:
+                      _isRegistered ? _unregisterFromEvent : _registerForEvent,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: _isRegistered ? Colors.red : Colors.blueAccent,
+                    backgroundColor:
+                        _isRegistered ? Colors.red : Colors.black87,
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
                   ),
-                  child: Text(_isRegistered ? 'Отменить запись' : 'Записаться'),
+                  child: Text(
+                    _isRegistered ? 'Отменить запись' : 'Записаться',
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
                 ),
               ),
             const SizedBox(height: 12),
@@ -291,10 +340,11 @@ class _EventDetailScreenState extends State<EventDetailScreen> {
                   icon: const Icon(Icons.directions),
                   label: const Text('Построить маршрут'),
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.blueAccent,
-                    side: const BorderSide(color: Colors.blueAccent),
+                    foregroundColor: Colors.black87,
+                    side: const BorderSide(color: Colors.black87),
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
               ),

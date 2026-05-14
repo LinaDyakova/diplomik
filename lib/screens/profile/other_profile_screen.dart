@@ -20,7 +20,7 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
   bool _isFriend = false;
   int _followersCount = 0;
   int _followingCount = 0;
-  
+
   @override
   void initState() {
     super.initState();
@@ -53,26 +53,22 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
           .eq('follower_id', widget.userId);
 
       final currentUserId = SupabaseConfig.auth.currentUser?.id;
-      
+
       if (currentUserId != null && currentUserId != widget.userId) {
         final isFollowingResponse = await SupabaseConfig.client
             .from('follows')
             .select()
             .eq('follower_id', currentUserId)
             .eq('following_id', widget.userId);
-        
-        final isCurrentUserFollowing = isFollowingResponse.isNotEmpty;
-        
+
         final isFollowedBackResponse = await SupabaseConfig.client
             .from('follows')
             .select()
             .eq('follower_id', widget.userId)
             .eq('following_id', currentUserId);
-        
-        final isFollowedBack = isFollowedBackResponse.isNotEmpty;
-        
+
         setState(() {
-          _isFriend = isCurrentUserFollowing && isFollowedBack;
+          _isFriend = isFollowingResponse.isNotEmpty && isFollowedBackResponse.isNotEmpty;
         });
       }
 
@@ -118,88 +114,70 @@ class _OtherProfileScreenState extends State<OtherProfileScreen> {
           .select()
           .eq('follower_id', currentUserId)
           .eq('following_id', widget.userId);
-      
-      final isCurrentUserFollowing = isFollowingResponse.isNotEmpty;
-      
+
       final isFollowedBackResponse = await SupabaseConfig.client
           .from('follows')
           .select()
           .eq('follower_id', widget.userId)
           .eq('following_id', currentUserId);
-      
-      final isFollowedBack = isFollowedBackResponse.isNotEmpty;
-      
+
       setState(() {
-        _isFriend = isCurrentUserFollowing && isFollowedBack;
+        _isFriend = isFollowingResponse.isNotEmpty && isFollowedBackResponse.isNotEmpty;
       });
     } catch (e) {
       print('Error checking friendship status: $e');
     }
   }
 
-Future<void> _toggleFollow() async {
-  final currentUserId = SupabaseConfig.auth.currentUser?.id;
-  if (currentUserId == null) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Войдите, чтобы подписаться'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
-
-  if (currentUserId == widget.userId) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Нельзя подписаться на себя'),
-        backgroundColor: Colors.red,
-      ),
-    );
-    return;
-  }
-
-  try {
-    if (_isFollowing) {
-      await SupabaseConfig.client
-          .from('follows')
-          .delete()
-          .eq('follower_id', currentUserId)
-          .eq('following_id', widget.userId);
-    } else {
-      await SupabaseConfig.client.from('follows').insert({
-        'follower_id': currentUserId,
-        'following_id': widget.userId,
-      });
+  Future<void> _toggleFollow() async {
+    final currentUserId = SupabaseConfig.auth.currentUser?.id;
+    if (currentUserId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Войдите, чтобы подписаться'), backgroundColor: Colors.red),
+      );
+      return;
     }
 
-    await _checkFriendshipStatus();
+    if (currentUserId == widget.userId) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Нельзя подписаться на себя'), backgroundColor: Colors.red),
+      );
+      return;
+    }
 
-    setState(() {
-      _isFollowing = !_isFollowing;
-      _followersCount = _isFollowing 
-          ? _followersCount + 1 
-          : _followersCount - 1;
-    });
+    try {
+      if (_isFollowing) {
+        await SupabaseConfig.client
+            .from('follows')
+            .delete()
+            .eq('follower_id', currentUserId)
+            .eq('following_id', widget.userId);
+      } else {
+        await SupabaseConfig.client.from('follows').insert({
+          'follower_id': currentUserId,
+          'following_id': widget.userId,
+        });
+      }
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          _isFollowing ? 'Вы подписались' : 'Вы отписались',
+      await _checkFriendshipStatus();
+
+      setState(() {
+        _isFollowing = !_isFollowing;
+        _followersCount = _isFollowing ? _followersCount + 1 : _followersCount - 1;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(_isFollowing ? 'Вы подписались' : 'Вы отписались'),
+          backgroundColor: _isFollowing ? Colors.green : Colors.grey,
         ),
-        backgroundColor: _isFollowing ? Colors.green : Colors.grey,
-      ),
-    );
-  } catch (e) {
-    print('Error toggling follow: $e');
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Ошибка: ${e.toString()}'),
-        backgroundColor: Colors.red,
-      ),
-    );
+      );
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Ошибка: ${e.toString()}'), backgroundColor: Colors.red),
+      );
+    }
   }
-}
 
   void _openFollowersList() {
     Navigator.push(
@@ -244,23 +222,13 @@ Future<void> _toggleFollow() async {
         appBar: AppBar(
           backgroundColor: Colors.white,
           elevation: 0.5,
-          title: const Text(
-            'Профиль',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
-            ),
-          ),
+          title: const Text('Профиль', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
           leading: IconButton(
             icon: const Icon(Icons.arrow_back, color: Colors.black87),
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        body: const Center(
-          child: CircularProgressIndicator(
-            color: Colors.blueAccent,
-          ),
-        ),
+        body: const Center(child: CircularProgressIndicator(color: Colors.black87)),
       );
     }
 
@@ -273,9 +241,7 @@ Future<void> _toggleFollow() async {
             onPressed: () => Navigator.pop(context),
           ),
         ),
-        body: const Center(
-          child: Text('Пользователь не найден'),
-        ),
+        body: const Center(child: Text('Пользователь не найден')),
       );
     }
 
@@ -286,10 +252,7 @@ Future<void> _toggleFollow() async {
         elevation: 0.5,
         title: Text(
           '@${_profile!['username']}',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+          style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -298,6 +261,8 @@ Future<void> _toggleFollow() async {
       ),
       body: RefreshIndicator(
         onRefresh: _loadProfileData,
+        color: Colors.black87,
+        backgroundColor: Colors.white,
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
@@ -324,40 +289,28 @@ Future<void> _toggleFollow() async {
                                 ? NetworkImage(_profile!['avatar_url'])
                                 : null,
                             child: _profile?['avatar_url'] == null
-                                ? const Icon(
-                                    Icons.person,
-                                    size: 40,
-                                    color: Colors.grey,
-                                  )
+                                ? const Icon(Icons.person, size: 40, color: Colors.grey)
                                 : null,
                           ),
                         ),
-                        
                         const SizedBox(width: 20),
-                        
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 '@${_profile?['username'] ?? 'Пользователь'}',
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Colors.black87),
                               ),
-                              
                               if (_profile?['bio'] != null && _profile!['bio'].isNotEmpty)
                                 Padding(
                                   padding: const EdgeInsets.only(top: 8.0),
                                   child: Text(
                                     _profile!['bio'],
-                                    style: const TextStyle(fontSize: 14),
+                                    style: const TextStyle(fontSize: 14, color: Colors.black87),
                                   ),
                                 ),
-                              
                               const SizedBox(height: 16),
-                              
                               Column(
                                 children: [
                                   SizedBox(
@@ -365,36 +318,19 @@ Future<void> _toggleFollow() async {
                                     child: ElevatedButton(
                                       onPressed: _toggleFollow,
                                       style: ElevatedButton.styleFrom(
-                                        backgroundColor: _isFollowing 
-                                            ? Colors.grey[200] 
-                                            : Colors.blueAccent,
-                                        foregroundColor: _isFollowing 
-                                            ? Colors.black87 
-                                            : Colors.white,
-                                        side: _isFollowing 
-                                            ? BorderSide(color: Colors.grey[300]!)
-                                            : null,
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
+                                        backgroundColor: _isFollowing ? Colors.grey[200] : Colors.black87,
+                                        foregroundColor: _isFollowing ? Colors.black87 : Colors.white,
+                                        side: _isFollowing ? BorderSide(color: Colors.grey[300]!) : null,
+                                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                                         elevation: 0,
                                       ),
-                                      child: Text(
-                                        _isFollowing ? 'Отписаться' : 'Подписаться',
-                                      ),
+                                      child: Text(_isFollowing ? 'Отписаться' : 'Подписаться'),
                                     ),
                                   ),
-                                  
                                   if (_isFriend)
                                     Padding(
                                       padding: const EdgeInsets.only(top: 4.0),
-                                      child: Text(
-                                        'Друг',
-                                        style: TextStyle(
-                                          color: Colors.green[700],
-                                          fontSize: 12,
-                                        ),
-                                      ),
+                                      child: Text('Друг', style: TextStyle(color: Colors.green[700], fontSize: 12)),
                                     ),
                                 ],
                               ),
@@ -406,7 +342,6 @@ Future<void> _toggleFollow() async {
                   ],
                 ),
               ),
-              
               Container(
                 padding: const EdgeInsets.symmetric(vertical: 20.0),
                 decoration: BoxDecoration(
@@ -420,73 +355,34 @@ Future<void> _toggleFollow() async {
                   children: [
                     Column(
                       children: [
-                        Text(
-                          _posts.length.toString(),
-                          style: const TextStyle(
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
+                        Text(_posts.length.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 4),
-                        Text(
-                          'Постов',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
+                        Text('Постов', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                       ],
                     ),
-                    
                     GestureDetector(
                       onTap: () => _openFollowersList(),
                       child: Column(
                         children: [
-                          Text(
-                            _followersCount.toString(),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          Text(_followersCount.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text(
-                            'Подписчиков',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
+                          Text('Подписчиков', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                         ],
                       ),
                     ),
-                    
                     GestureDetector(
                       onTap: () => _openFollowingList(),
                       child: Column(
                         children: [
-                          Text(
-                            _followingCount.toString(),
-                            style: const TextStyle(
-                              fontSize: 20,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
+                          Text(_followingCount.toString(), style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 4),
-                          Text(
-                            'Подписок',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[600],
-                            ),
-                          ),
+                          Text('Подписок', style: TextStyle(fontSize: 14, color: Colors.grey[600])),
                         ],
                       ),
                     ),
                   ],
                 ),
               ),
-              
               _buildPostsSection(),
             ],
           ),
@@ -504,20 +400,9 @@ Future<void> _toggleFollow() async {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.photo_library_outlined,
-                size: 80,
-                color: Colors.grey[300],
-              ),
+              Icon(Icons.photo_library_outlined, size: 80, color: Colors.grey[300]),
               const SizedBox(height: 16),
-              const Text(
-                'Пока нет постов',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.grey,
-                ),
-              ),
+              const Text('Пока нет постов', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600, color: Colors.grey)),
             ],
           ),
         ),
@@ -558,11 +443,10 @@ Future<void> _toggleFollow() async {
                               width: 20,
                               height: 20,
                               child: CircularProgressIndicator(
-                                color: Colors.blueAccent,
+                                color: Colors.black87,
                                 strokeWidth: 2,
                                 value: loadingProgress.expectedTotalBytes != null
-                                    ? loadingProgress.cumulativeBytesLoaded /
-                                        loadingProgress.expectedTotalBytes!
+                                    ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
                                     : null,
                               ),
                             ),
@@ -572,25 +456,13 @@ Future<void> _toggleFollow() async {
                       errorBuilder: (context, error, stackTrace) {
                         return Container(
                           color: Colors.grey[200],
-                          child: const Center(
-                            child: Icon(
-                              Icons.photo_outlined,
-                              color: Colors.grey,
-                              size: 24,
-                            ),
-                          ),
+                          child: const Center(child: Icon(Icons.photo_outlined, color: Colors.grey, size: 24)),
                         );
                       },
                     )
                   : Container(
                       color: Colors.grey[200],
-                      child: const Center(
-                        child: Icon(
-                          Icons.photo_outlined,
-                          color: Colors.grey,
-                          size: 24,
-                        ),
-                      ),
+                      child: const Center(child: Icon(Icons.photo_outlined, color: Colors.grey, size: 24)),
                     ),
             ),
           );

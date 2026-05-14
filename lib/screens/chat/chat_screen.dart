@@ -24,9 +24,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Map<String, dynamic>? _chatInfo;
   bool _isLoading = true;
   bool _isSending = false;
-  bool _isScreenActive = true;
-  int _subscriberCount = 0;   
-  int _participantCount = 0;  
+  int _subscriberCount = 0;
+  int _participantCount = 0;
 
   @override
   void initState() {
@@ -37,24 +36,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   }
 
   @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    if (_isScreenActive) {
-      _loadChatData();
-    }
-  }
-
-  @override
-  void didUpdateWidget(ChatScreen oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.chatId != widget.chatId) {
-      _loadChatData();
-    }
-  }
-
-  @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
       _loadChatData();
     }
@@ -71,62 +53,41 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _loadChatData() async {
     try {
       setState(() => _isLoading = true);
-
       final chatResponse = await SupabaseConfig.client
           .rpc('get_chat_details', params: {'p_chat_id': widget.chatId})
           .single();
-
       final messagesResponse = await SupabaseConfig.client
           .rpc('get_chat_messages', params: {'p_chat_id': widget.chatId});
-
       List<Map<String, dynamic>> messages = [];
-      if (messagesResponse != null) {
-        if (messagesResponse is List) {
-          messages = List<Map<String, dynamic>>.from(messagesResponse);
-        } else if (messagesResponse is String) {
-          try {
-            final parsed = jsonDecode(messagesResponse);
-            if (parsed is List) {
-              messages = List<Map<String, dynamic>>.from(parsed);
-            }
-          } catch (e) {
-            print('❌ Ошибка парсинга JSON: $e');
-          }
-        }
+      if (messagesResponse is List) {
+        messages = List<Map<String, dynamic>>.from(messagesResponse);
+      } else if (messagesResponse is String) {
+        final parsed = jsonDecode(messagesResponse);
+        if (parsed is List) messages = List<Map<String, dynamic>>.from(parsed);
       }
-
       await _markMessagesAsRead();
-
       setState(() {
         _chatInfo = chatResponse;
         _messages = messages;
       });
-
       final chatType = _chatInfo?['type'] ?? (_chatInfo?['is_group'] == true ? 'group' : 'private');
       if (chatType == 'channel') {
         final countRes = await SupabaseConfig.client
             .from('chat_participants')
             .select('user_id')
             .eq('chat_id', widget.chatId);
-        setState(() {
-          _subscriberCount = countRes.length;
-        });
+        setState(() => _subscriberCount = countRes.length);
       } else if (chatType == 'group') {
         final participants = _chatInfo?['chat_participants'] as List? ?? [];
-        setState(() {
-          _participantCount = participants.length;
-        });
+        setState(() => _participantCount = participants.length);
       }
-
       setState(() => _isLoading = false);
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
         }
       });
     } catch (e) {
-      print('❌ Ошибка загрузки чата: $e');
       await _loadChatDataFallback();
     }
   }
@@ -135,56 +96,36 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     try {
       final messagesResponse = await SupabaseConfig.client
           .from('messages')
-          .select('''
-            *,
-            profiles!messages_sender_id_fkey(username, avatar_url)
-          ''')
+          .select('*, profiles!messages_sender_id_fkey(username, avatar_url)')
           .eq('chat_id', widget.chatId)
           .order('created_at', ascending: true);
-
       final chatResponse = await SupabaseConfig.client
           .from('chats')
           .select('*')
           .eq('id', widget.chatId)
           .single();
-
       final participantsResponse = await SupabaseConfig.client
           .from('chat_participants')
-          .select('''
-            user_id,
-            profiles!chat_participants_user_id_fkey(username, avatar_url)
-          ''')
+          .select('user_id, profiles!chat_participants_user_id_fkey(username, avatar_url)')
           .eq('chat_id', widget.chatId);
-
       await _markMessagesAsRead();
-
       setState(() {
-        _chatInfo = {
-          ...chatResponse,
-          'chat_participants': participantsResponse
-        };
+        _chatInfo = {...chatResponse, 'chat_participants': participantsResponse};
         _messages = List<Map<String, dynamic>>.from(messagesResponse);
       });
-
       final chatType = _chatInfo?['type'] ?? (_chatInfo?['is_group'] == true ? 'group' : 'private');
       if (chatType == 'channel') {
         final countRes = await SupabaseConfig.client
             .from('chat_participants')
             .select('user_id')
             .eq('chat_id', widget.chatId);
-        setState(() {
-          _subscriberCount = countRes.length;
-        });
+        setState(() => _subscriberCount = countRes.length);
       } else if (chatType == 'group') {
         final participants = _chatInfo?['chat_participants'] as List? ?? [];
-        setState(() {
-          _participantCount = participants.length;
-        });
+        setState(() => _participantCount = participants.length);
       }
-
       setState(() => _isLoading = false);
     } catch (e) {
-      print('❌ Ошибка в fallback загрузке: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -199,77 +140,51 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           .eq('chat_id', widget.chatId)
           .neq('sender_id', userId)
           .eq('is_read', false);
-
       await SupabaseConfig.client
           .from('chat_participants')
           .update({'unread_count': 0})
           .eq('chat_id', widget.chatId)
           .eq('user_id', userId);
-
       widget.onMessagesRead();
-    } catch (e) {
-      print('❌ Ошибка пометки сообщений как прочитанных: $e');
-    }
+    } catch (_) {}
   }
 
   Future<void> _sendMessage() async {
     final message = _messageController.text.trim();
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (message.isEmpty || userId == null) return;
-
     final chatType = _chatInfo?['type'] ?? (_chatInfo?['is_group'] == true ? 'group' : 'private');
-    final creatorId = _chatInfo?['creator_id'];
-
-    if (chatType == 'channel' && creatorId != userId) {
+    if (chatType == 'channel' && _chatInfo?['creator_id'] != userId) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Только создатель канала может отправлять сообщения')),
       );
       return;
     }
-
     setState(() => _isSending = true);
     try {
-      final response = await SupabaseConfig.client
-          .rpc('send_chat_message', params: {
-            'p_chat_id': widget.chatId,
-            'p_sender_id': userId,
-            'p_content': message,
-          });
-
+      final response = await SupabaseConfig.client.rpc('send_chat_message', params: {
+        'p_chat_id': widget.chatId,
+        'p_sender_id': userId,
+        'p_content': message,
+      });
       Map<String, dynamic> messageData;
       if (response is Map<String, dynamic>) {
         messageData = response;
       } else if (response is String) {
-        try {
-          messageData = jsonDecode(response) as Map<String, dynamic>;
-        } catch (e) {
-          print('❌ Ошибка парсинга ответа: $e');
-          messageData = {
-            'id': DateTime.now().millisecondsSinceEpoch,
-            'content': message,
-            'sender_id': userId,
-            'created_at': DateTime.now().toIso8601String(),
-            'profiles': {'username': 'Вы', 'avatar_url': null}
-          };
-        }
+        messageData = jsonDecode(response);
       } else {
-        throw Exception('Неизвестный формат ответа');
+        messageData = {
+          'id': DateTime.now().millisecondsSinceEpoch,
+          'content': message,
+          'sender_id': userId,
+          'created_at': DateTime.now().toIso8601String(),
+          'profiles': {'username': 'Вы', 'avatar_url': null}
+        };
       }
-
       _messageController.clear();
-
-      final messageExists = _messages.any((msg) =>
-          msg['id'] == messageData['id'] ||
-          (msg['content'] == message &&
-              msg['sender_id'] == userId &&
-              DateTime.parse(msg['created_at']).difference(DateTime.now()).inSeconds.abs() < 5));
-
-      if (!messageExists) {
-        setState(() {
-          _messages.add(messageData);
-        });
+      if (!_messages.any((msg) => msg['id'] == messageData['id'])) {
+        setState(() => _messages.add(messageData));
       }
-
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (_scrollController.hasClients) {
           _scrollController.animateTo(
@@ -279,10 +194,8 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
           );
         }
       });
-
       widget.onMessagesRead();
     } catch (e) {
-      print('❌ Ошибка отправки сообщения: $e');
       await _sendMessageFallback(message, userId);
     } finally {
       setState(() => _isSending = false);
@@ -291,52 +204,17 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
 
   Future<void> _sendMessageFallback(String message, String userId) async {
     try {
-      final newMessage = {
+      await SupabaseConfig.client.from('messages').insert({
         'chat_id': widget.chatId,
         'sender_id': userId,
         'content': message,
-        'message_type': 'text',
-        'is_read': false,
-      };
-      await SupabaseConfig.client
-          .from('messages')
-          .insert(newMessage);
-
-      await SupabaseConfig.client
-          .from('chats')
-          .update({
-            'last_message': message,
-            'last_message_at': DateTime.now().toIso8601String(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', widget.chatId);
-
-      final currentUnreadResponse = await SupabaseConfig.client
-          .from('chat_participants')
-          .select('unread_count')
-          .eq('chat_id', widget.chatId)
-          .neq('user_id', userId)
-          .maybeSingle();
-      int currentUnread = 0;
-      if (currentUnreadResponse != null && currentUnreadResponse['unread_count'] != null) {
-        currentUnread = currentUnreadResponse['unread_count'] as int;
-      }
-      await SupabaseConfig.client
-          .from('chat_participants')
-          .update({'unread_count': currentUnread + 1})
-          .eq('chat_id', widget.chatId)
-          .neq('user_id', userId);
-
+      });
       _messageController.clear();
       await Future.delayed(const Duration(milliseconds: 500));
       await _loadChatData();
     } catch (e) {
-      print('❌ Ошибка в fallback отправке: $e');
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка отправки: ${e.toString()}'),
-          backgroundColor: Colors.red,
-        ),
+        SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
       );
     }
   }
@@ -345,25 +223,27 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
     final userId = SupabaseConfig.auth.currentUser?.id ?? '';
     if (_chatInfo == null) return 'Чат';
     final type = _chatInfo!['type'] ?? (_chatInfo!['is_group'] == true ? 'group' : 'private');
-    if (type == 'channel') {
-      return _chatInfo!['group_name'] ?? 'Канал';
-    } else if (type == 'group') {
-      return _chatInfo!['group_name'] ?? 'Групповой чат';
-    } else {
-      final participants = _chatInfo!['chat_participants'] ?? [];
-      for (var p in participants) {
-        if (p['user_id'] != userId && p['profiles'] != null) {
-          return '@${p['profiles']['username'] ?? 'Пользователь'}';
-        }
+    if (type == 'channel') return _chatInfo!['group_name'] ?? 'Канал';
+    if (type == 'group') return _chatInfo!['group_name'] ?? 'Групповой чат';
+    final participants = _chatInfo!['chat_participants'] ?? [];
+    for (var p in participants) {
+      if (p['user_id'] != userId && p['profiles'] != null) {
+        return '@${p['profiles']['username']}';
       }
-      return 'Чат';
     }
+    return 'Чат';
+  }
+
+  bool _isUserParticipant() {
+    final userId = SupabaseConfig.auth.currentUser?.id;
+    if (userId == null) return false;
+    final participants = _chatInfo?['chat_participants'] as List? ?? [];
+    return participants.any((p) => p['user_id'] == userId);
   }
 
   Future<void> _leaveOrDeleteChat() async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     final type = _chatInfo?['type'] ?? (_chatInfo?['is_group'] == true ? 'group' : 'private');
     final isCreator = _chatInfo?['creator_id'] == userId;
 
@@ -441,7 +321,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
   Future<void> _subscribeToChannel() async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     final creatorId = _chatInfo?['creator_id'];
     if (creatorId == userId) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -449,7 +328,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
       );
       return;
     }
-
     try {
       await SupabaseConfig.client.rpc('subscribe_to_channel', params: {
         'p_chat_id': widget.chatId,
@@ -464,193 +342,6 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
         SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
       );
     }
-  }
-
-  bool _isUserParticipant() {
-    final userId = SupabaseConfig.auth.currentUser?.id;
-    if (userId == null) return false;
-    final participants = _chatInfo?['chat_participants'] as List? ?? [];
-    return participants.any((p) => p['user_id'] == userId);
-  }
-
-  Widget _buildMessageBubble(Map<String, dynamic> message, bool isOwnMessage) {
-    final createdAt = message['created_at'] is String
-        ? DateTime.parse(message['created_at'])
-        : DateTime.now();
-    final content = message['content']?.toString() ?? '';
-    final profile = message['profiles'] ?? {};
-
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        mainAxisAlignment: isOwnMessage
-            ? MainAxisAlignment.end
-            : MainAxisAlignment.start,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          if (!isOwnMessage)
-            CircleAvatar(
-              radius: 16,
-              backgroundImage: profile['avatar_url'] != null
-                  ? NetworkImage(profile['avatar_url'])
-                  : null,
-              child: profile['avatar_url'] == null
-                  ? const Icon(Icons.person, size: 16)
-                  : null,
-            ),
-          if (!isOwnMessage) const SizedBox(width: 8),
-          Flexible(
-            child: Column(
-              crossAxisAlignment: isOwnMessage
-                  ? CrossAxisAlignment.end
-                  : CrossAxisAlignment.start,
-              children: [
-                if (!isOwnMessage && profile['username'] != null)
-                  Padding(
-                    padding: const EdgeInsets.only(left: 8, bottom: 4),
-                    child: Text(
-                      '@${profile['username']}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: isOwnMessage
-                        ? Colors.blueAccent
-                        : Colors.grey[100],
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    content,
-                    style: TextStyle(
-                      color: isOwnMessage ? Colors.white : Colors.black87,
-                      fontSize: 15,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Padding(
-                  padding: EdgeInsets.only(
-                    right: isOwnMessage ? 8 : 0,
-                    left: isOwnMessage ? 0 : 8,
-                  ),
-                  child: Text(
-                    timeago.format(createdAt, locale: 'ru'),
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.grey[500],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMessageInput() {
-    final userId = SupabaseConfig.auth.currentUser?.id;
-    final chatType = _chatInfo?['type'] ?? (_chatInfo?['is_group'] == true ? 'group' : 'private');
-    final creatorId = _chatInfo?['creator_id'];
-    bool canWrite = true;
-
-    if (chatType == 'channel') {
-      canWrite = creatorId == userId;
-    }
-
-    if (!_isUserParticipant()) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        color: Colors.white,
-        child: Center(
-          child: ElevatedButton(
-            onPressed: _subscribeToChannel,
-            child: const Text('Подписаться на канал'),
-          ),
-        ),
-      );
-    }
-
-    if (!canWrite) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        color: Colors.white,
-        child: const Center(
-          child: Text(
-            'Вы не можете писать в этом канале',
-            style: TextStyle(color: Colors.grey),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border(
-          top: BorderSide(color: Colors.grey[200]!),
-        ),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: Colors.grey[300]!),
-              ),
-              child: Row(
-                children: [
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: TextField(
-                      controller: _messageController,
-                      decoration: const InputDecoration(
-                        hintText: 'Сообщение...',
-                        border: InputBorder.none,
-                      ),
-                      maxLines: null,
-                      onSubmitted: (_) => _sendMessage(),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Container(
-            decoration: BoxDecoration(
-              color: Colors.blueAccent,
-              shape: BoxShape.circle,
-            ),
-            child: IconButton(
-              onPressed: _isSending ? null : _sendMessage,
-              icon: _isSending
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        color: Colors.white,
-                        strokeWidth: 2,
-                      ),
-                    )
-                  : const Icon(Icons.send, color: Colors.white),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _showAddParticipantsDialog() async {
@@ -702,6 +393,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                   return CheckboxListTile(
                     title: Text('@${user['username']}'),
                     value: isSelected,
+                    activeColor: Colors.black87,
                     onChanged: (selected) {
                       setStateDialog(() {
                         if (selected == true) {
@@ -742,6 +434,7 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                     );
                   }
                 },
+                style: ElevatedButton.styleFrom(backgroundColor: Colors.black87),
                 child: const Text('Добавить'),
               ),
             ],
@@ -778,70 +471,35 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                 Expanded(
                   child: Text(
                     _getChatName(),
-                    style: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
+                    style: const TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
             if (isChannel)
-              Text(
-                'Подписчиков: $_subscriberCount',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
+              Text('Подписчиков: $_subscriberCount', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
             if (isGroup)
-              Text(
-                'Участников: $_participantCount',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[600],
-                ),
-              ),
+              Text('Участников: $_participantCount', style: TextStyle(fontSize: 12, color: Colors.grey[600])),
           ],
         ),
         actions: [
           if (isGroup)
             IconButton(
-              icon: const Icon(Icons.person_add, color: Colors.blueAccent),
+              icon: const Icon(Icons.person_add, color: Colors.black87),
               onPressed: _showAddParticipantsDialog,
-              tooltip: 'Добавить участников',
             ),
           IconButton(
             icon: Icon(
-              isChannel
-                  ? (isCreator ? Icons.delete_forever : Icons.exit_to_app)
-                  : Icons.logout,
+              isChannel ? (isCreator ? Icons.delete_forever : Icons.exit_to_app) : Icons.logout,
               color: Colors.red,
             ),
             onPressed: _leaveOrDeleteChat,
-            tooltip: isChannel
-                ? (isCreator ? 'Удалить канал' : 'Отписаться')
-                : (isGroup ? 'Выйти из беседы' : 'Удалить чат'),
           ),
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(
-                    color: Colors.blueAccent,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Загрузка сообщений...',
-                    style: TextStyle(color: Colors.grey),
-                  ),
-                ],
-              ),
-            )
+          ? const Center(child: CircularProgressIndicator(color: Colors.black87))
           : Column(
               children: [
                 Expanded(
@@ -850,44 +508,142 @@ class _ChatScreenState extends State<ChatScreen> with WidgetsBindingObserver {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(
-                                Icons.forum_outlined,
-                                size: 80,
-                                color: Colors.grey[300],
-                              ),
+                              Icon(Icons.forum_outlined, size: 80, color: Colors.grey[300]),
                               const SizedBox(height: 20),
-                              const Text(
-                                'Нет сообщений',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text(
-                                'Начните диалог первым',
-                                style: TextStyle(color: Colors.grey),
-                              ),
+                              const Text('Нет сообщений', style: TextStyle(fontSize: 18, color: Colors.grey)),
                             ],
                           ),
                         )
-                      : RefreshIndicator(
-                          onRefresh: _loadChatData,
-                          child: ListView.builder(
-                            controller: _scrollController,
-                            padding: const EdgeInsets.all(16),
-                            itemCount: _messages.length,
-                            itemBuilder: (context, index) {
-                              final message = _messages[index];
-                              final isOwnMessage = message['sender_id'] == SupabaseConfig.auth.currentUser?.id;
-                              return _buildMessageBubble(message, isOwnMessage);
-                            },
-                          ),
+                      : ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _messages.length,
+                          itemBuilder: (context, index) {
+                            final message = _messages[index];
+                            final isOwn = message['sender_id'] == SupabaseConfig.auth.currentUser?.id;
+                            return _buildMessageBubble(message, isOwn);
+                          },
                         ),
                 ),
                 _buildMessageInput(),
               ],
             ),
+    );
+  }
+
+  Widget _buildMessageBubble(Map<String, dynamic> msg, bool isOwn) {
+    final content = msg['content']?.toString() ?? '';
+    final profile = msg['profiles'] ?? {};
+    final time = msg['created_at'] is String ? DateTime.parse(msg['created_at']) : DateTime.now();
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        mainAxisAlignment: isOwn ? MainAxisAlignment.end : MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          if (!isOwn) ...[
+            CircleAvatar(
+              radius: 14,
+              backgroundImage: profile['avatar_url'] != null ? NetworkImage(profile['avatar_url']) : null,
+              child: profile['avatar_url'] == null ? const Icon(Icons.person, size: 14) : null,
+            ),
+            const SizedBox(width: 8),
+          ],
+          Flexible(
+            child: Column(
+              crossAxisAlignment: isOwn ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              children: [
+                if (!isOwn && profile['username'] != null)
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4, bottom: 2),
+                    child: Text('@${profile['username']}', style: TextStyle(fontSize: 11, color: Colors.grey[600])),
+                  ),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: isOwn ? Colors.black87 : Colors.grey[100],
+                    borderRadius: BorderRadius.circular(18),
+                  ),
+                  child: Text(content, style: TextStyle(color: isOwn ? Colors.white : Colors.black87, fontSize: 15)),
+                ),
+                const SizedBox(height: 4),
+                Text(timeago.format(time, locale: 'ru'), style: TextStyle(fontSize: 10, color: Colors.grey[500])),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMessageInput() {
+    final userId = SupabaseConfig.auth.currentUser?.id;
+    final chatType = _chatInfo?['type'] ?? (_chatInfo?['is_group'] == true ? 'group' : 'private');
+    final creatorId = _chatInfo?['creator_id'];
+    bool canWrite = chatType != 'channel' || creatorId == userId;
+
+    if (!_isUserParticipant()) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        color: Colors.white,
+        child: Center(
+          child: ElevatedButton(
+            onPressed: _subscribeToChannel,
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.black87, foregroundColor: Colors.white),
+            child: const Text('Подписаться на канал'),
+          ),
+        ),
+      );
+    }
+    if (!canWrite) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        color: Colors.white,
+        child: const Center(child: Text('Вы не можете писать в этом канале', style: TextStyle(color: Colors.grey))),
+      );
+    }
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border(top: BorderSide(color: Colors.grey[200]!)),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.grey[100],
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: Colors.grey[300]!),
+              ),
+              child: Row(
+                children: [
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: TextField(
+                      controller: _messageController,
+                      decoration: const InputDecoration(hintText: 'Сообщение...', border: InputBorder.none),
+                      maxLines: null,
+                      onSubmitted: (_) => _sendMessage(),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Container(
+            decoration: BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
+            child: IconButton(
+              onPressed: _isSending ? null : _sendMessage,
+              icon: _isSending
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
+                  : const Icon(Icons.send, color: Colors.white),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

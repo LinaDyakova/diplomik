@@ -5,7 +5,6 @@ import 'package:flutter_map_marker_cluster/flutter_map_marker_cluster.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:latlong2/latlong.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:vroom/models/service_model.dart';
 import 'package:vroom/screens/map/city_picker_dialog.dart';
 import 'package:vroom/screens/map/service_filter_sheet.dart';
@@ -38,7 +37,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
   List<Map<String, dynamic>> _allFuelStations = [];
   List<Map<String, dynamic>> _filteredFuelStations = [];
 
-  String _searchMode = 'city'; 
+  String _searchMode = 'city';
   static const double _nearbyRadiusMeters = 5000;
 
   @override
@@ -371,10 +370,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(service.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(service.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
                     const SizedBox(height: 8),
                     if (service.address.isNotEmpty)
-                      Text('📍 ${service.address}'),
+                      Text('📍 ${service.address}', style: const TextStyle(color: Colors.black87)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -382,7 +381,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                         const SizedBox(width: 4),
                         Text(service.rating.toStringAsFixed(1)),
                         const SizedBox(width: 16),
-                        const Text('Ваша оценка:'),
+                        const Text('Ваша оценка:', style: TextStyle(color: Colors.black87)),
                         ...List.generate(5, (i) {
                           final starIcon = Icon(
                             i < selectedRating ? Icons.star : Icons.star_border,
@@ -469,8 +468,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                             Navigator.pop(context);
                             _openExternalNavigation(LatLng(service.latitude, service.longitude));
                           },
-                          icon: const Icon(Icons.directions),
+                          icon: const Icon(Icons.directions, size: 18),
                           label: const Text('Маршрут'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black87,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
                         ),
                       ],
                     ),
@@ -494,10 +499,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(service.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(service.name, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
             const SizedBox(height: 8),
             if (service.address.isNotEmpty)
-              Text('📍 ${service.address}'),
+              Text('📍 ${service.address}', style: const TextStyle(color: Colors.black87)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -505,7 +510,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                 const SizedBox(width: 4),
                 Text(service.rating.toStringAsFixed(1)),
                 const SizedBox(width: 16),
-                const Text('Войдите, чтобы оценить'),
+                const Text('Войдите, чтобы оценить', style: TextStyle(color: Colors.grey)),
               ],
             ),
             const SizedBox(height: 16),
@@ -517,8 +522,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                     Navigator.pop(context);
                     _openExternalNavigation(LatLng(service.latitude, service.longitude));
                   },
-                  icon: const Icon(Icons.directions),
+                  icon: const Icon(Icons.directions, size: 18),
                   label: const Text('Маршрут'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black87,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
                 ),
               ],
             ),
@@ -581,10 +592,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                   mainAxisSize: MainAxisSize.min,
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(station['name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                    Text(station['name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
                     const SizedBox(height: 8),
                     if (station['address'] != null)
-                      Text('📍 ${station['address']}'),
+                      Text('📍 ${station['address']}', style: const TextStyle(color: Colors.black87)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
@@ -592,7 +603,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                         const SizedBox(width: 4),
                         Text((station['rating'] ?? 0.0).toStringAsFixed(1)),
                         const SizedBox(width: 16),
-                        const Text('Ваша оценка:'),
+                        const Text('Ваша оценка:', style: TextStyle(color: Colors.black87)),
                         ...List.generate(5, (i) {
                           final starIcon = Icon(
                             i < selectedRating ? Icons.star : Icons.star_border,
@@ -678,8 +689,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                             Navigator.pop(context);
                             _openExternalNavigation(LatLng(station['latitude'], station['longitude']));
                           },
-                          icon: const Icon(Icons.directions),
+                          icon: const Icon(Icons.directions, size: 18),
                           label: const Text('Маршрут'),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.black87,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
                         ),
                       ],
                     ),
@@ -703,10 +720,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(station['name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            Text(station['name'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
             const SizedBox(height: 8),
             if (station['address'] != null)
-              Text('📍 ${station['address']}'),
+              Text('📍 ${station['address']}', style: const TextStyle(color: Colors.black87)),
             const SizedBox(height: 12),
             Row(
               children: [
@@ -714,7 +731,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                 const SizedBox(width: 4),
                 Text((station['rating'] ?? 0.0).toStringAsFixed(1)),
                 const SizedBox(width: 16),
-                const Text('Войдите, чтобы оценить'),
+                const Text('Войдите, чтобы оценить', style: TextStyle(color: Colors.grey)),
               ],
             ),
             const SizedBox(height: 16),
@@ -726,8 +743,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                     Navigator.pop(context);
                     _openExternalNavigation(LatLng(station['latitude'], station['longitude']));
                   },
-                  icon: const Icon(Icons.directions),
+                  icon: const Icon(Icons.directions, size: 18),
                   label: const Text('Маршрут'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black87,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
                 ),
               ],
             ),
@@ -749,15 +772,15 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(event['title'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(event['title'], style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Colors.black87)),
               const SizedBox(height: 8),
               if (event['location'] != null && event['location'].isNotEmpty)
-                Text('📍 ${event['location']}'),
+                Text('📍 ${event['location']}', style: const TextStyle(color: Colors.black87)),
               const SizedBox(height: 8),
               if (event['description'] != null && event['description'].isNotEmpty)
                 Text(
                   event['description'],
-                  style: const TextStyle(fontSize: 14),
+                  style: const TextStyle(fontSize: 14, color: Colors.black87),
                 ),
               const SizedBox(height: 16),
               Row(
@@ -769,8 +792,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                         Navigator.pop(context);
                         _openExternalNavigation(LatLng(event['latitude'], event['longitude']));
                       },
-                      icon: const Icon(Icons.directions),
+                      icon: const Icon(Icons.directions, size: 18),
                       label: const Text('Маршрут'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.black87,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        elevation: 0,
+                      ),
                     ),
                 ],
               ),
@@ -791,28 +820,60 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         title: const Text('Карта', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87)),
         actions: [
           IconButton(
-            icon: const Icon(Icons.my_location),
+            icon: const Icon(Icons.my_location, color: Colors.black87),
             onPressed: _centerOnUser,
             tooltip: 'Моё местоположение',
           ),
+          // Иконка фильтра с индикатором активного фильтра
           IconButton(
-            icon: const Icon(Icons.filter_list),
+            icon: Stack(
+              children: [
+                const Icon(Icons.filter_list, color: Colors.black87),
+                if (_selectedServiceType != null)
+                  Positioned(
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: const BoxDecoration(
+                        color: Colors.red,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Text(
+                        '!',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
             onPressed: _showServiceFilter,
             tooltip: 'Фильтр сервисов',
           ),
           IconButton(
-            icon: const Icon(Icons.edit_location_alt),
+            icon: const Icon(Icons.edit_location_alt, color: Colors.black87),
             onPressed: _showCityPicker,
             tooltip: 'Сменить город',
           ),
           IconButton(
-            icon: _searchMode == 'city' ? const Icon(Icons.location_city) : const Icon(Icons.my_location),
+            icon: _searchMode == 'city'
+                ? const Icon(Icons.location_city, color: Colors.black87)
+                : const Icon(Icons.my_location, color: Colors.black87),
             onPressed: _toggleSearchMode,
             tooltip: _searchMode == 'city' ? 'Показать рядом со мной' : 'Показать по городу',
           ),
         ],
+        // Классический TabBar с полоской под словами
         bottom: TabBar(
           controller: _tabController,
+          indicatorColor: Colors.black87,
+          indicatorWeight: 2,
+          labelColor: Colors.black87,
+          unselectedLabelColor: Colors.grey,
+          labelStyle: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
           tabs: const [
             Tab(text: 'Сервисы'),
             Tab(text: 'Мероприятия'),
@@ -821,7 +882,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         ),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: Colors.black87))
           : Stack(
               children: [
                 FlutterMap(
@@ -848,9 +909,9 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                 onTap: () => _showServiceDetails(service),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.blueAccent,
+                                    color: const Color(0xFF4A90E2),
                                     shape: BoxShape.circle,
-                                    boxShadow: const [BoxShadow(blurRadius: 4)],
+                                    boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                                   ),
                                   child: const Icon(Icons.car_repair, color: Colors.white, size: 20),
                                 ),
@@ -860,9 +921,9 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                           builder: (context, markers) {
                             return Container(
                               decoration: BoxDecoration(
-                                color: Colors.blueAccent,
+                                color: const Color(0xFF4A90E2),
                                 shape: BoxShape.circle,
-                                boxShadow: const [BoxShadow(blurRadius: 4)],
+                                boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                               ),
                               child: Center(
                                 child: Text(
@@ -887,9 +948,9 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                               onTap: () => _showEventDetails(event),
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.redAccent,
+                                  color: const Color(0xFFE25C4A),
                                   shape: BoxShape.circle,
-                                  boxShadow: const [BoxShadow(blurRadius: 4)],
+                                  boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                                 ),
                                 child: Icon(_getEventIcon(category), color: Colors.white, size: 20),
                               ),
@@ -910,9 +971,9 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                 onTap: () => _showFuelStationDetails(station),
                                 child: Container(
                                   decoration: BoxDecoration(
-                                    color: Colors.green,
+                                    color: const Color(0xFF2ECC71),
                                     shape: BoxShape.circle,
-                                    boxShadow: const [BoxShadow(blurRadius: 4)],
+                                    boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                                   ),
                                   child: const Icon(Icons.local_gas_station, color: Colors.white, size: 20),
                                 ),
@@ -922,9 +983,9 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                           builder: (context, markers) {
                             return Container(
                               decoration: BoxDecoration(
-                                color: Colors.green,
+                                color: const Color(0xFF2ECC71),
                                 shape: BoxShape.circle,
-                                boxShadow: const [BoxShadow(blurRadius: 4)],
+                                boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                               ),
                               child: Center(
                                 child: Text(
@@ -945,10 +1006,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                             point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
                             child: Container(
                               decoration: BoxDecoration(
-                                color: Colors.blue,
+                                color: Colors.black87,
                                 shape: BoxShape.circle,
                                 border: Border.all(color: Colors.white, width: 2),
-                                boxShadow: const [BoxShadow(blurRadius: 4)],
+                                boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                               ),
                               child: const Icon(Icons.my_location, color: Colors.white, size: 20),
                             ),

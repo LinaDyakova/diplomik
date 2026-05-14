@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:vroom/screens/profile/other_profile_screen.dart';
 import 'package:vroom/supabase/supabase_config.dart';
@@ -37,14 +38,11 @@ class _MainFeedScreenState extends State<MainFeedScreen>
 
   void _onSearchChanged() {
     if (_searchDebounce?.isActive ?? false) _searchDebounce!.cancel();
-    
     _searchDebounce = Timer(const Duration(milliseconds: 500), () {
       if (_searchController.text.trim().isNotEmpty) {
         _performSearch(_searchController.text.trim());
       } else {
-        setState(() {
-          _searchResults.clear();
-        });
+        setState(() => _searchResults.clear());
       }
     });
   }
@@ -57,9 +55,7 @@ class _MainFeedScreenState extends State<MainFeedScreen>
       });
       return;
     }
-
     setState(() => _isSearching = true);
-
     try {
       final response = await SupabaseConfig.client
           .from('profiles')
@@ -70,7 +66,6 @@ class _MainFeedScreenState extends State<MainFeedScreen>
           ''')
           .ilike('username', '%$query%')
           .limit(10);
-
       setState(() {
         _searchResults = List<Map<String, dynamic>>.from(response);
         _isSearching = false;
@@ -84,9 +79,7 @@ class _MainFeedScreenState extends State<MainFeedScreen>
   void _openUserProfile(String userId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => OtherProfileScreen(userId: userId),
-      ),
+      MaterialPageRoute(builder: (context) => OtherProfileScreen(userId: userId)),
     );
   }
 
@@ -103,10 +96,11 @@ class _MainFeedScreenState extends State<MainFeedScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
+        centerTitle: false,
         title: _showSearch
             ? TextField(
                 controller: _searchController,
@@ -119,7 +113,7 @@ class _MainFeedScreenState extends State<MainFeedScreen>
                 style: const TextStyle(fontSize: 16),
               )
             : const Text(
-                'VROOM',
+                'Главная',
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.black87,
@@ -133,27 +127,34 @@ class _MainFeedScreenState extends State<MainFeedScreen>
             color: Colors.black87,
           ),
         ],
-        bottom: _showSearch ? null : TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.blueAccent,
-          indicatorWeight: 3,
-          labelColor: Colors.black87,
-          unselectedLabelColor: Colors.grey,
-          labelStyle: const TextStyle(
-            fontWeight: FontWeight.w600,
-            fontSize: 14,
-          ),
-          tabs: const [
-            Tab(text: 'Общая'),
-            Tab(text: 'Подписки'),
-            Tab(text: 'Друзья'),
-          ],
-        ),
+        bottom: _showSearch
+            ? null
+            : TabBar(
+                controller: _tabController,
+                indicator: BoxDecoration(
+                  color: Colors.black87,
+                  borderRadius: BorderRadius.circular(60),
+                ),
+                indicatorSize: TabBarIndicatorSize.tab,
+                indicatorWeight: 0,
+                labelColor: Colors.white,
+                unselectedLabelColor: Colors.grey,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w600,
+                  fontSize: 14,
+                ),
+                labelPadding: const EdgeInsets.symmetric(vertical: 2),
+                tabs: const [
+                  Tab(text: 'Общая'),
+                  Tab(text: 'Подписки'),
+                  Tab(text: 'Друзья'),
+                ],
+              ),
       ),
       body: _showSearch
           ? _buildSearchResults()
           : Container(
-              color: Colors.grey[100],
+              color: Colors.white,
               child: TabBarView(
                 controller: _tabController,
                 children: const [
@@ -169,58 +170,39 @@ class _MainFeedScreenState extends State<MainFeedScreen>
   Widget _buildSearchResults() {
     if (_isSearching) {
       return const Center(
-        child: CircularProgressIndicator(
-          color: Colors.blueAccent,
-        ),
+        child: CircularProgressIndicator(color: Colors.black87),
       );
     }
-
     if (_searchController.text.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search,
-              size: 80,
-              color: Colors.grey[300],
-            ),
+            Icon(Icons.search, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 20),
             Text(
               'Начните вводить имя пользователя',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
             ),
           ],
         ),
       );
     }
-
     if (_searchResults.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.person_search,
-              size: 80,
-              color: Colors.grey[300],
-            ),
+            Icon(Icons.person_search, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 20),
             Text(
               'Пользователи не найдены',
-              style: TextStyle(
-                fontSize: 16,
-                color: Colors.grey[500],
-              ),
+              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
             ),
           ],
         ),
       );
     }
-
     return ListView.builder(
       padding: const EdgeInsets.all(16),
       itemCount: _searchResults.length,
@@ -228,17 +210,21 @@ class _MainFeedScreenState extends State<MainFeedScreen>
         final user = _searchResults[index];
         final postsCount = user['posts']?[0]?['count'] ?? 0;
         final followersCount = user['follows']?[0]?['count'] ?? 0;
-
-        return Card(
+        return Container(
           margin: const EdgeInsets.only(bottom: 12),
-          shape: RoundedRectangleBorder(
+          decoration: BoxDecoration(
+            color: Colors.white,
             borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.grey.withOpacity(0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
           child: ListTile(
-            contentPadding: const EdgeInsets.symmetric(
-              horizontal: 16,
-              vertical: 12,
-            ),
+            contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             leading: CircleAvatar(
               radius: 28,
               backgroundColor: Colors.grey[200],
@@ -246,18 +232,12 @@ class _MainFeedScreenState extends State<MainFeedScreen>
                   ? NetworkImage(user['avatar_url'])
                   : null,
               child: user['avatar_url'] == null
-                  ? const Icon(
-                      Icons.person,
-                      color: Colors.grey,
-                    )
+                  ? const Icon(Icons.person, color: Colors.grey)
                   : null,
             ),
             title: Text(
               '@${user['username']}',
-              style: const TextStyle(
-                fontWeight: FontWeight.w600,
-                fontSize: 16,
-              ),
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16),
             ),
             subtitle: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -267,10 +247,7 @@ class _MainFeedScreenState extends State<MainFeedScreen>
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(
                       user['bio'],
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 13,
-                      ),
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                     ),
@@ -288,16 +265,12 @@ class _MainFeedScreenState extends State<MainFeedScreen>
             trailing: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               decoration: BoxDecoration(
-                color: Colors.blueAccent,
+                color: Colors.black87,
                 borderRadius: BorderRadius.circular(20),
               ),
               child: const Text(
                 'Профиль',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                ),
+                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
             onTap: () => _openUserProfile(user['id']),
@@ -310,28 +283,148 @@ class _MainFeedScreenState extends State<MainFeedScreen>
   Widget _buildStatItem(String label, String value) {
     return Column(
       children: [
-        Text(
-          value,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            fontSize: 14,
-          ),
-        ),
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            color: Colors.grey[600],
-          ),
-        ),
+        Text(value, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        Text(label, style: TextStyle(fontSize: 11, color: Colors.grey[600])),
       ],
     );
   }
 }
 
+// ------------------- Анимированная кнопка лайка (всплеск) -------------------
+class _LikeButton extends StatefulWidget {
+  final bool isLiked;
+  final VoidCallback onTap;
+
+  const _LikeButton({Key? key, required this.isLiked, required this.onTap}) : super(key: key);
+
+  @override
+  State<_LikeButton> createState() => _LikeButtonState();
+}
+
+class _LikeButtonState extends State<_LikeButton>
+    with TickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late Animation<double> _scaleAnimation;
+
+  late AnimationController _splashController;
+  final List<_SplashParticle> _particles = [];
+
+  @override
+  void initState() {
+    super.initState();
+
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.3).animate(
+      CurvedAnimation(parent: _scaleController, curve: Curves.easeOutBack),
+    );
+    _scaleController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        _scaleController.reverse();
+      }
+    });
+
+    _splashController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    // Генерируем 6 частиц под разными углами
+    for (int i = 0; i < 6; i++) {
+      _particles.add(_SplashParticle(
+        angle: (i * 60) * (pi / 180),
+        color: widget.isLiked ? Colors.red : Colors.grey[600]!,
+      ));
+    }
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    _splashController.dispose();
+    super.dispose();
+  }
+
+  void _handleTap() {
+    _scaleController.forward();
+    _splashController.reset();
+    _splashController.forward();
+    widget.onTap();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _handleTap,
+      child: SizedBox(
+        width: 30,
+        height: 30,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            ...List.generate(_particles.length, (index) {
+              return AnimatedBuilder(
+                animation: _splashController,
+                builder: (context, child) {
+                  final progress = _splashController.value;
+                  if (progress == 0.0) return const SizedBox.shrink();
+                  final opacity = (1 - progress).clamp(0.0, 1.0);
+                  final scale = 0.5 + progress * 1.5;
+                  final particle = _particles[index];
+                  final dx = cos(particle.angle) * 12 * progress;
+                  final dy = sin(particle.angle) * 12 * progress;
+
+                  return Transform.translate(
+                    offset: Offset(dx, dy),
+                    child: Opacity(
+                      opacity: opacity,
+                      child: Transform.scale(
+                        scale: scale,
+                        child: Container(
+                          width: 4,
+                          height: 4,
+                          decoration: BoxDecoration(
+                            color: particle.color,
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            }),
+            AnimatedBuilder(
+              animation: _scaleAnimation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: _scaleAnimation.value,
+                  child: Icon(
+                    widget.isLiked ? Icons.favorite : Icons.favorite_border,
+                    color: widget.isLiked ? Colors.red : Colors.grey[600],
+                    size: 26,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SplashParticle {
+  final double angle;
+  final Color color;
+  _SplashParticle({required this.angle, required this.color});
+}
+
+// ------------------- GeneralFeedTab -------------------
 class GeneralFeedTab extends StatefulWidget {
   const GeneralFeedTab({super.key});
-
   @override
   State<GeneralFeedTab> createState() => _GeneralFeedTabState();
 }
@@ -359,7 +452,6 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
             comments(count)
           ''')
           .order('created_at', ascending: false);
-
       setState(() {
         _posts = List<Map<String, dynamic>>.from(response);
         _isLoading = false;
@@ -373,13 +465,11 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
   Future<void> _loadUserLikes() async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     try {
       final response = await SupabaseConfig.client
           .from('likes')
           .select('post_id')
           .eq('user_id', userId);
-
       setState(() {
         _likedPosts = Set.from(response.map((like) => like['post_id'] as int));
       });
@@ -396,16 +486,13 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
   void _openPostDetail(int postId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => PostDetailScreen(postId: postId),
-      ),
+      MaterialPageRoute(builder: (context) => PostDetailScreen(postId: postId)),
     );
   }
 
   Future<void> _likePost(int postId, bool currentlyLiked) async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     try {
       if (currentlyLiked) {
         await SupabaseConfig.client
@@ -419,7 +506,6 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
           'post_id': postId,
         });
       }
-
       setState(() {
         if (currentlyLiked) {
           _likedPosts.remove(postId);
@@ -427,7 +513,6 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
           _likedPosts.add(postId);
         }
       });
-
       await _loadPosts();
     } catch (e) {
       print('Error toggling like: $e');
@@ -437,17 +522,12 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Colors.blueAccent,
-        ),
-      );
+      return const Center(child: CircularProgressIndicator(color: Colors.black87));
     }
-
     return RefreshIndicator(
       onRefresh: _refreshData,
       backgroundColor: Colors.white,
-      color: Colors.blueAccent,
+      color: Colors.black87,
       child: ListView.builder(
         itemCount: _posts.length,
         padding: const EdgeInsets.all(8.0),
@@ -464,14 +544,13 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
     final postId = post['id'];
     final likesCount = post['likes']?[0]?['count'] ?? 0;
     final commentsCount = post['comments']?[0]?['count'] ?? 0;
-
     return GestureDetector(
       onTap: () => _openPostDetail(postId),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16.0),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20.0),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.1),
@@ -489,58 +568,41 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: Colors.grey[300],
+                    backgroundColor: Colors.grey[200],
                     backgroundImage: post['profiles']?['avatar_url'] != null
                         ? NetworkImage(post['profiles']['avatar_url'])
                         : null,
                     child: post['profiles']?['avatar_url'] == null
-                        ? const Icon(
-                            Icons.person,
-                            color: Colors.grey,
-                          )
+                        ? const Icon(Icons.person, color: Colors.grey)
                         : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '@${post['profiles']?['username'] ?? 'Пользователь'}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      '@${post['profiles']?['username'] ?? 'Пользователь'}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-
             if (post['content'] != null && post['content'].toString().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
                   post['content'],
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: Colors.black87,
-                  ),
+                  style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black87),
                 ),
               ),
-
             if (post['photo_url'] != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12.0),
                 child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.zero,
-                    bottom: Radius.circular(20.0),
-                  ),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                   child: Container(
                     color: Colors.grey[100],
                     child: Image.network(
@@ -555,7 +617,7 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                           color: Colors.grey[200],
                           child: Center(
                             child: CircularProgressIndicator(
-                              color: Colors.blueAccent,
+                              color: Colors.black87,
                               value: loadingProgress.expectedTotalBytes != null
                                   ? loadingProgress.cumulativeBytesLoaded /
                                       loadingProgress.expectedTotalBytes!
@@ -569,11 +631,7 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                           height: 280,
                           color: Colors.grey[200],
                           child: const Center(
-                            child: Icon(
-                              Icons.photo,
-                              size: 60,
-                              color: Colors.grey,
-                            ),
+                            child: Icon(Icons.photo, size: 60, color: Colors.grey),
                           ),
                         );
                       },
@@ -581,22 +639,14 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                   ),
                 ),
               ),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      _likePost(postId, isLiked);
-                    },
-                    icon: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : Colors.grey[600],
-                      size: 26,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  _LikeButton(
+                    key: ValueKey(postId),
+                    isLiked: isLiked,
+                    onTap: () => _likePost(postId, isLiked),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -608,20 +658,11 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
                     ),
                   ),
                   const SizedBox(width: 24),
-
-                  const Icon(
-                    Icons.comment_outlined,
-                    color: Colors.grey,
-                    size: 26,
-                  ),
+                  const Icon(Icons.comment_outlined, color: Colors.grey, size: 26),
                   const SizedBox(width: 4),
                   Text(
                     commentsCount.toString(),
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500, fontSize: 14),
                   ),
                 ],
               ),
@@ -633,9 +674,9 @@ class _GeneralFeedTabState extends State<GeneralFeedTab> {
   }
 }
 
+// ------------------- FollowingFeedTab -------------------
 class FollowingFeedTab extends StatefulWidget {
   const FollowingFeedTab({super.key});
-
   @override
   State<FollowingFeedTab> createState() => _FollowingFeedTabState();
 }
@@ -659,12 +700,10 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
         setState(() => _isLoading = false);
         return;
       }
-
       final followingResponse = await SupabaseConfig.client
           .from('follows')
           .select('following_id')
           .eq('follower_id', userId);
-
       if (followingResponse.isEmpty) {
         setState(() {
           _posts = [];
@@ -672,11 +711,9 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
         });
         return;
       }
-
       final followingIds = followingResponse
           .map((item) => item['following_id'] as String)
           .toList();
-
       final response = await SupabaseConfig.client
           .from('posts')
           .select('''
@@ -687,7 +724,6 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
           ''')
           .inFilter('user_id', followingIds)
           .order('created_at', ascending: false);
-
       setState(() {
         _posts = List<Map<String, dynamic>>.from(response);
         _isLoading = false;
@@ -701,13 +737,11 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
   Future<void> _loadUserLikes() async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     try {
       final response = await SupabaseConfig.client
           .from('likes')
           .select('post_id')
           .eq('user_id', userId);
-
       setState(() {
         _likedPosts = Set.from(response.map((like) => like['post_id'] as int));
       });
@@ -724,16 +758,13 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
   void _openPostDetail(int postId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => PostDetailScreen(postId: postId),
-      ),
+      MaterialPageRoute(builder: (context) => PostDetailScreen(postId: postId)),
     );
   }
 
   Future<void> _likePost(int postId, bool currentlyLiked) async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     try {
       if (currentlyLiked) {
         await SupabaseConfig.client
@@ -747,7 +778,6 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
           'post_id': postId,
         });
       }
-
       setState(() {
         if (currentlyLiked) {
           _likedPosts.remove(postId);
@@ -755,7 +785,6 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
           _likedPosts.add(postId);
         }
       });
-
       await _loadPosts();
     } catch (e) {
       print('Error toggling like: $e');
@@ -765,31 +794,18 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Colors.blueAccent,
-        ),
-      );
+      return const Center(child: CircularProgressIndicator(color: Colors.black87));
     }
-
     if (_posts.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.group,
-              size: 80,
-              color: Colors.grey[300],
-            ),
+            Icon(Icons.group, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 20),
             const Text(
               'Нет постов от подписок',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey),
             ),
             const SizedBox(height: 10),
             const Padding(
@@ -809,19 +825,20 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
               icon: const Icon(Icons.search),
               label: const Text('Найти пользователей'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
+                backgroundColor: Colors.black87,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
               ),
             ),
           ],
         ),
       );
     }
-
     return RefreshIndicator(
       onRefresh: _refreshData,
       backgroundColor: Colors.white,
-      color: Colors.blueAccent,
+      color: Colors.black87,
       child: ListView.builder(
         itemCount: _posts.length,
         padding: const EdgeInsets.all(8.0),
@@ -838,14 +855,13 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
     final postId = post['id'];
     final likesCount = post['likes']?[0]?['count'] ?? 0;
     final commentsCount = post['comments']?[0]?['count'] ?? 0;
-
     return GestureDetector(
       onTap: () => _openPostDetail(postId),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16.0),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20.0),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.1),
@@ -863,58 +879,41 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: Colors.grey[300],
+                    backgroundColor: Colors.grey[200],
                     backgroundImage: post['profiles']?['avatar_url'] != null
                         ? NetworkImage(post['profiles']['avatar_url'])
                         : null,
                     child: post['profiles']?['avatar_url'] == null
-                        ? const Icon(
-                            Icons.person,
-                            color: Colors.grey,
-                          )
+                        ? const Icon(Icons.person, color: Colors.grey)
                         : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '@${post['profiles']?['username'] ?? 'Пользователь'}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      '@${post['profiles']?['username'] ?? 'Пользователь'}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-
             if (post['content'] != null && post['content'].toString().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
                   post['content'],
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: Colors.black87,
-                  ),
+                  style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black87),
                 ),
               ),
-
             if (post['photo_url'] != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12.0),
                 child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.zero,
-                    bottom: Radius.circular(20.0),
-                  ),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                   child: Container(
                     color: Colors.grey[100],
                     child: Image.network(
@@ -929,7 +928,7 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
                           color: Colors.grey[200],
                           child: Center(
                             child: CircularProgressIndicator(
-                              color: Colors.blueAccent,
+                              color: Colors.black87,
                               value: loadingProgress.expectedTotalBytes != null
                                   ? loadingProgress.cumulativeBytesLoaded /
                                       loadingProgress.expectedTotalBytes!
@@ -943,11 +942,7 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
                           height: 280,
                           color: Colors.grey[200],
                           child: const Center(
-                            child: Icon(
-                              Icons.photo,
-                              size: 60,
-                              color: Colors.grey,
-                            ),
+                            child: Icon(Icons.photo, size: 60, color: Colors.grey),
                           ),
                         );
                       },
@@ -955,22 +950,14 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
                   ),
                 ),
               ),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      _likePost(postId, isLiked);
-                    },
-                    icon: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : Colors.grey[600],
-                      size: 26,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  _LikeButton(
+                    key: ValueKey(postId),
+                    isLiked: isLiked,
+                    onTap: () => _likePost(postId, isLiked),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -982,20 +969,11 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
                     ),
                   ),
                   const SizedBox(width: 24),
-
-                  const Icon(
-                    Icons.comment_outlined,
-                    color: Colors.grey,
-                    size: 26,
-                  ),
+                  const Icon(Icons.comment_outlined, color: Colors.grey, size: 26),
                   const SizedBox(width: 4),
                   Text(
                     commentsCount.toString(),
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500, fontSize: 14),
                   ),
                 ],
               ),
@@ -1007,9 +985,9 @@ class _FollowingFeedTabState extends State<FollowingFeedTab> {
   }
 }
 
+// ------------------- FriendsFeedTab -------------------
 class FriendsFeedTab extends StatefulWidget {
   const FriendsFeedTab({super.key});
-
   @override
   State<FriendsFeedTab> createState() => _FriendsFeedTabState();
 }
@@ -1033,27 +1011,21 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
         setState(() => _isLoading = false);
         return;
       }
-
       final followingResponse = await SupabaseConfig.client
           .from('follows')
           .select('following_id')
           .eq('follower_id', userId);
-
       final followersResponse = await SupabaseConfig.client
           .from('follows')
           .select('follower_id')
           .eq('following_id', userId);
-
       final followingIds = followingResponse
           .map((item) => item['following_id'] as String)
           .toSet();
-      
       final followerIds = followersResponse
           .map((item) => item['follower_id'] as String)
           .toSet();
-
       final mutualFriends = followingIds.intersection(followerIds).toList();
-
       if (mutualFriends.isEmpty) {
         setState(() {
           _posts = [];
@@ -1061,7 +1033,6 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
         });
         return;
       }
-
       final response = await SupabaseConfig.client
           .from('posts')
           .select('''
@@ -1072,7 +1043,6 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
           ''')
           .inFilter('user_id', mutualFriends)
           .order('created_at', ascending: false);
-
       setState(() {
         _posts = List<Map<String, dynamic>>.from(response);
         _isLoading = false;
@@ -1086,13 +1056,11 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
   Future<void> _loadUserLikes() async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     try {
       final response = await SupabaseConfig.client
           .from('likes')
           .select('post_id')
           .eq('user_id', userId);
-
       setState(() {
         _likedPosts = Set.from(response.map((like) => like['post_id'] as int));
       });
@@ -1109,16 +1077,13 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
   void _openPostDetail(int postId) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (context) => PostDetailScreen(postId: postId),
-      ),
+      MaterialPageRoute(builder: (context) => PostDetailScreen(postId: postId)),
     );
   }
 
-    Future<void> _likePost(int postId, bool currentlyLiked) async {
+  Future<void> _likePost(int postId, bool currentlyLiked) async {
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
-
     try {
       if (currentlyLiked) {
         await SupabaseConfig.client
@@ -1132,7 +1097,6 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
           'post_id': postId,
         });
       }
-
       setState(() {
         if (currentlyLiked) {
           _likedPosts.remove(postId);
@@ -1140,7 +1104,6 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
           _likedPosts.add(postId);
         }
       });
-
       await _loadPosts();
     } catch (e) {
       debugPrint('Error toggling like: $e');
@@ -1150,31 +1113,18 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
   @override
   Widget build(BuildContext context) {
     if (_isLoading) {
-      return const Center(
-        child: CircularProgressIndicator(
-          color: Colors.blueAccent,
-        ),
-      );
-    } 
-
+      return const Center(child: CircularProgressIndicator(color: Colors.black87));
+    }
     if (_posts.isEmpty) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.people,
-              size: 80,
-              color: Colors.grey[300],
-            ),
+            Icon(Icons.people, size: 80, color: Colors.grey[300]),
             const SizedBox(height: 20),
             const Text(
               'Нет постов от друзей',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.w600,
-                color: Colors.grey,
-              ),
+              style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey),
             ),
             const SizedBox(height: 10),
             const Padding(
@@ -1194,19 +1144,20 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
               icon: const Icon(Icons.search),
               label: const Text('Найти друзей'),
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blueAccent,
+                backgroundColor: Colors.black87,
                 foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 0,
               ),
             ),
           ],
         ),
       );
     }
-
     return RefreshIndicator(
       onRefresh: _refreshData,
       backgroundColor: Colors.white,
-      color: Colors.blueAccent,
+      color: Colors.black87,
       child: ListView.builder(
         itemCount: _posts.length,
         padding: const EdgeInsets.all(8.0),
@@ -1219,18 +1170,17 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
     );
   }
 
-    Widget _buildPostCard(Map<String, dynamic> post, bool isLiked) {
+  Widget _buildPostCard(Map<String, dynamic> post, bool isLiked) {
     final postId = post['id'];
     final likesCount = post['likes']?[0]?['count'] ?? 0;
     final commentsCount = post['comments']?[0]?['count'] ?? 0;
-
     return GestureDetector(
       onTap: () => _openPostDetail(postId),
       child: Container(
         margin: const EdgeInsets.only(bottom: 16.0),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(20.0),
+          borderRadius: BorderRadius.circular(12),
           boxShadow: [
             BoxShadow(
               color: Colors.grey.withOpacity(0.1),
@@ -1248,58 +1198,41 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
                 children: [
                   CircleAvatar(
                     radius: 22,
-                    backgroundColor: Colors.grey[300],
+                    backgroundColor: Colors.grey[200],
                     backgroundImage: post['profiles']?['avatar_url'] != null
                         ? NetworkImage(post['profiles']['avatar_url'])
                         : null,
                     child: post['profiles']?['avatar_url'] == null
-                        ? const Icon(
-                            Icons.person,
-                            color: Colors.grey,
-                          )
+                        ? const Icon(Icons.person, color: Colors.grey)
                         : null,
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '@${post['profiles']?['username'] ?? 'Пользователь'}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                            fontSize: 16,
-                            color: Colors.black87,
-                          ),
-                        ),
-                      ],
+                    child: Text(
+                      '@${post['profiles']?['username'] ?? 'Пользователь'}',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w600,
+                        fontSize: 16,
+                        color: Colors.black87,
+                      ),
                     ),
                   ),
                 ],
               ),
             ),
-
             if (post['content'] != null && post['content'].toString().isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16.0),
                 child: Text(
                   post['content'],
-                  style: const TextStyle(
-                    fontSize: 15,
-                    height: 1.5,
-                    color: Colors.black87,
-                  ),
+                  style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.black87),
                 ),
               ),
-
             if (post['photo_url'] != null)
               Padding(
                 padding: const EdgeInsets.only(top: 12.0),
                 child: ClipRRect(
-                  borderRadius: const BorderRadius.vertical(
-                    top: Radius.zero,
-                    bottom: Radius.circular(20.0),
-                  ),
+                  borderRadius: const BorderRadius.vertical(bottom: Radius.circular(12)),
                   child: Container(
                     color: Colors.grey[100],
                     child: Image.network(
@@ -1314,7 +1247,7 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
                           color: Colors.grey[200],
                           child: Center(
                             child: CircularProgressIndicator(
-                              color: Colors.blueAccent,
+                              color: Colors.black87,
                               value: loadingProgress.expectedTotalBytes != null
                                   ? loadingProgress.cumulativeBytesLoaded /
                                       loadingProgress.expectedTotalBytes!
@@ -1328,11 +1261,7 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
                           height: 280,
                           color: Colors.grey[200],
                           child: const Center(
-                            child: Icon(
-                              Icons.photo,
-                              size: 60,
-                              color: Colors.grey,
-                            ),
+                            child: Icon(Icons.photo, size: 60, color: Colors.grey),
                           ),
                         );
                       },
@@ -1340,22 +1269,14 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
                   ),
                 ),
               ),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
               child: Row(
                 children: [
-                  IconButton(
-                    onPressed: () {
-                      _likePost(postId, isLiked);
-                    },
-                    icon: Icon(
-                      isLiked ? Icons.favorite : Icons.favorite_border,
-                      color: isLiked ? Colors.red : Colors.grey[600],
-                      size: 26,
-                    ),
-                    padding: EdgeInsets.zero,
-                    constraints: const BoxConstraints(),
+                  _LikeButton(
+                    key: ValueKey(postId),
+                    isLiked: isLiked,
+                    onTap: () => _likePost(postId, isLiked),
                   ),
                   const SizedBox(width: 4),
                   Text(
@@ -1367,20 +1288,11 @@ class _FriendsFeedTabState extends State<FriendsFeedTab> {
                     ),
                   ),
                   const SizedBox(width: 24),
-
-                  const Icon(
-                    Icons.comment_outlined,
-                    color: Colors.grey,
-                    size: 26,
-                  ),
+                  const Icon(Icons.comment_outlined, color: Colors.grey, size: 26),
                   const SizedBox(width: 4),
                   Text(
                     commentsCount.toString(),
-                    style: TextStyle(
-                      color: Colors.grey[700],
-                      fontWeight: FontWeight.w500,
-                      fontSize: 14,
-                    ),
+                    style: TextStyle(color: Colors.grey[700], fontWeight: FontWeight.w500, fontSize: 14),
                   ),
                 ],
               ),

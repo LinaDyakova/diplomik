@@ -1,7 +1,7 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:vroom/screens/chat/chat_screen.dart';
 import 'package:vroom/screens/chat/create_group_chat_screen.dart';
-import 'package:vroom/screens/search/search_screen.dart';
 import 'package:vroom/supabase/supabase_config.dart';
 import 'package:timeago/timeago.dart' as timeago;
 
@@ -14,8 +14,12 @@ class ChatsListScreen extends StatefulWidget {
 
 class _ChatsListScreenState extends State<ChatsListScreen> {
   List<Map<String, dynamic>> _chats = [];
+  List<Map<String, dynamic>> _filteredChats = [];
   bool _isLoading = true;
   int _unreadCount = 0;
+  bool _showSearch = false;
+  final TextEditingController _searchController = TextEditingController();
+  Timer? _debounce;
 
   @override
   void initState() {
@@ -23,6 +27,50 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
     _loadChats();
     _loadUnreadCount();
     timeago.setLocaleMessages('ru', timeago.RuMessages());
+  }
+
+  @override
+  void dispose() {
+    _debounce?.cancel();
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  void _onSearchChanged(String query) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      _filterChats(query.trim().toLowerCase());
+    });
+  }
+
+  void _filterChats(String query) {
+    if (query.isEmpty) {
+      _filteredChats = List.from(_chats);
+    } else {
+      _filteredChats = _chats.where((chat) {
+        final type = chat['type'] ?? (chat['is_group'] == true ? 'group' : 'private');
+        String name = '';
+        if (type == 'channel' || type == 'group') {
+          name = (chat['group_name'] ?? '').toLowerCase();
+        } else {
+          name = '@${chat['other_username'] ?? ''}'.toLowerCase();
+        }
+        return name.contains(query);
+      }).toList();
+    }
+    setState(() {});
+  }
+
+  void _toggleSearch() {
+    setState(() {
+      _showSearch = !_showSearch;
+      if (!_showSearch) {
+        _searchController.clear();
+        _filteredChats = List.from(_chats);
+      } else {
+        _filteredChats = List.from(_chats);
+      }
+    });
   }
 
   Future<void> _loadChats() async {
@@ -38,10 +86,8 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
 
       if (response != null && response is List) {
         List<Map<String, dynamic>> chats = [];
-
         for (var chatData in response) {
           final chatMap = Map<String, dynamic>.from(chatData);
-
           chats.add({
             'id': chatMap['chat_id'],
             'created_at': chatMap['created_at'],
@@ -59,17 +105,13 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
             'other_avatar_url': chatMap['other_avatar_url'],
           });
         }
-
-        setState(() {
-          _chats = chats;
-          _isLoading = false;
-        });
-        print('Загружено ${_chats.length} чатов');
+        _chats = chats;
+        _filteredChats = List.from(chats);
+        _isLoading = false;
       } else {
         await _loadChatsSimple(userId);
       }
     } catch (e) {
-      print('Ошибка загрузки чатов: $e');
       await _loadChatsSimple(userId);
     }
   }
@@ -84,6 +126,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
       if (participantsResponse.isEmpty) {
         setState(() {
           _chats = [];
+          _filteredChats = [];
           _isLoading = false;
         });
         return;
@@ -105,20 +148,18 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
               .select('''
                 user_id,
                 unread_count,
-                joined_at,
                 profiles!chat_participants_user_id_fkey(username, avatar_url)
               ''')
               .eq('chat_id', chatId);
 
-          final participants = (participantsData as List)
-              .map((p) => {
-                    'user_id': p['user_id'],
-                    'username': p['profiles']?['username'] ?? 'Пользователь',
-                    'avatar_url': p['profiles']?['avatar_url'],
-                    'joined_at': p['joined_at'],
-                    'unread_count': p['unread_count'] ?? 0,
-                  })
-              .toList();
+          final participants = (participantsData as List).map((p) {
+            return {
+              'user_id': p['user_id'],
+              'username': p['profiles']?['username'] ?? 'Пользователь',
+              'avatar_url': p['profiles']?['avatar_url'],
+              'unread_count': p['unread_count'] ?? 0,
+            };
+          }).toList();
 
           final lastMessageResponse = await SupabaseConfig.client
               .from('messages')
@@ -127,9 +168,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
               .order('created_at', ascending: false)
               .limit(1);
 
-          final lastMessage = lastMessageResponse.isNotEmpty
-              ? lastMessageResponse[0]['content']
-              : null;
+          final lastMessage = lastMessageResponse.isNotEmpty ? lastMessageResponse[0]['content'] : null;
           final lastMessageAt = lastMessageResponse.isNotEmpty
               ? DateTime.parse(lastMessageResponse[0]['created_at'])
               : null;
@@ -169,12 +208,15 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
 
       setState(() {
         _chats = chats;
+        _filteredChats = List.from(chats);
         _isLoading = false;
       });
-      print('Загружено ${chats.length} чатов через simple метод');
     } catch (e) {
-      print('Ошибка simple загрузки чатов: $e');
-      setState(() => _isLoading = false);
+      setState(() {
+        _chats = [];
+        _filteredChats = [];
+        _isLoading = false;
+      });
     }
   }
 
@@ -185,9 +227,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
       final response = await SupabaseConfig.client
           .rpc('get_unread_messages_count', params: {'user_uuid': userId});
       if (response != null) {
-        setState(() {
-          _unreadCount = response as int;
-        });
+        setState(() => _unreadCount = response as int);
       }
     } catch (e) {
       print('Error loading unread notifications count: $e');
@@ -229,14 +269,12 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
 
     final type = chat['type'] ?? (chat['is_group'] ? 'group' : 'private');
     final isCreator = chat['creator_id'] == userId;
-    final isChannel = type == 'channel';
-    final isGroup = type == 'group';
 
     String confirmMessage;
     String actionButtonText;
     bool willDelete = false;
 
-    if (isChannel) {
+    if (type == 'channel') {
       if (isCreator) {
         confirmMessage = 'Удалить канал "${chat['group_name']}"?';
         actionButtonText = 'Удалить';
@@ -245,7 +283,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
         confirmMessage = 'Отписаться от канала "${chat['group_name']}"?';
         actionButtonText = 'Отписаться';
       }
-    } else if (isGroup) {
+    } else if (type == 'group') {
       confirmMessage = 'Выйти из беседы "${chat['group_name']}"?';
       actionButtonText = 'Выйти';
     } else {
@@ -290,12 +328,12 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
         });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isChannel ? 'Вы отписались от канала' : 'Вы вышли из чата'),
+            content: Text(type == 'channel' ? 'Вы отписались от канала' : 'Вы вышли из чата'),
             backgroundColor: Colors.green,
           ),
         );
       }
-      _loadChats(); 
+      _loadChats();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
@@ -308,19 +346,11 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.forum_outlined,
-            size: 80,
-            color: Colors.grey[300],
-          ),
+          Icon(Icons.forum_outlined, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 20),
           const Text(
             'Нет сообщений',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: Colors.grey,
-            ),
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600, color: Colors.grey),
           ),
           const SizedBox(height: 10),
           const Padding(
@@ -337,7 +367,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
             icon: const Icon(Icons.add_comment),
             label: const Text('Начать диалог'),
             style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.blueAccent,
+              backgroundColor: Colors.black87,
               foregroundColor: Colors.white,
             ),
           ),
@@ -348,39 +378,46 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final displayedChats = _showSearch ? _filteredChats : _chats;
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0.5,
-        title: const Text(
-          'Сообщения',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
-        ),
+        title: _showSearch
+            ? TextField(
+                controller: _searchController,
+                autofocus: true,
+                decoration: InputDecoration(
+                  hintText: 'Поиск чатов...',
+                  border: InputBorder.none,
+                  hintStyle: TextStyle(color: Colors.grey[500]),
+                ),
+                onChanged: _onSearchChanged,
+              )
+            : const Text(
+                'Чаты',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.search, color: Colors.blueAccent),
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const SearchScreen()),
+            icon: Icon(_showSearch ? Icons.close : Icons.search, color: Colors.black87),
+            onPressed: _toggleSearch,
+          ),
+          if (!_showSearch)
+            IconButton(
+              onPressed: _startNewChat,
+              icon: const Icon(Icons.edit, color: Colors.black87),
             ),
-          ),
-          IconButton(
-            onPressed: _startNewChat,
-            icon: const Icon(Icons.edit, color: Colors.blueAccent),
-          ),
         ],
       ),
       body: _isLoading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: Colors.blueAccent,
-              ),
-            )
-          : _chats.isEmpty
+          ? const Center(child: CircularProgressIndicator(color: Colors.black87))
+          : displayedChats.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: () async {
@@ -388,12 +425,12 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
                     await _loadUnreadCount();
                   },
                   backgroundColor: Colors.white,
-                  color: Colors.blueAccent,
+                  color: Colors.black87,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(8),
-                    itemCount: _chats.length,
+                    itemCount: displayedChats.length,
                     itemBuilder: (context, index) {
-                      final chat = _chats[index];
+                      final chat = displayedChats[index];
                       return Dismissible(
                         key: Key(chat['id'].toString()),
                         direction: DismissDirection.endToStart,
@@ -461,10 +498,18 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
       leadingIcon = Icons.person;
     }
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: Colors.white,
         borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: ListTile(
         contentPadding: const EdgeInsets.all(12),
@@ -476,12 +521,9 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
               backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
                   ? NetworkImage(avatarUrl)
                   : null,
-              child: avatarUrl == null || avatarUrl.isEmpty
-                  ? Icon(
-                      leadingIcon ?? (isGroup ? Icons.group : Icons.person),
-                      color: Colors.grey,
-                      size: 28,
-                    )
+              child: (avatarUrl == null || avatarUrl.isEmpty)
+                  ? Icon(leadingIcon ?? (isGroup ? Icons.group : Icons.person),
+                      color: Colors.grey, size: 28)
                   : null,
             ),
             if (unreadCount > 0)
@@ -498,10 +540,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
                   child: Text(
                     unreadCount > 9 ? '9+' : unreadCount.toString(),
                     style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                    ),
+                        color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -512,6 +551,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
           style: TextStyle(
             fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
             fontSize: 16,
+            color: Colors.black87,
           ),
         ),
         subtitle: lastMessage != null
@@ -530,10 +570,7 @@ class _ChatsListScreenState extends State<ChatsListScreen> {
         trailing: lastMessageAt != null
             ? Text(
                 timeago.format(lastMessageAt, locale: 'ru'),
-                style: TextStyle(
-                  fontSize: 12,
-                  color: Colors.grey[500],
-                ),
+                style: TextStyle(fontSize: 12, color: Colors.grey[500]),
               )
             : null,
         onTap: () => _openChat(chat['id']),

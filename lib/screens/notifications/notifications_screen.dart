@@ -25,61 +25,43 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _loadNotifications() async {
-  try {
-    final userId = SupabaseConfig.auth.currentUser?.id;
-    if (userId == null) {
-      print('Пользователь не авторизован');
-      setState(() => _isLoading = false);
-      return;
-    }
-
-    print('ID текущего пользователя: $userId');
-    
-    final testResponse = await SupabaseConfig.client
-        .from('notifications')
-        .select('*')
-        .eq('user_id', userId);
-    
-    print('Тестовый запрос (без join): $testResponse');
-    print('Количество уведомлений: ${testResponse.length}');
-
-    final response = await SupabaseConfig.client
-        .from('notifications')
-        .select('''
-          *,
-          profiles!notifications_actor_id_fkey(username, avatar_url)
-        ''')
-        .eq('user_id', userId)
-        .order('created_at', ascending: false);
-
-    print('Основной запрос: $response');
-    
-    if (response != null && response is List) {
-      List<NotificationModel> notifications = [];
-      
-      for (var item in response) {
-        try {
-          print('Обрабатываю уведомление: $item');
-          final notification = NotificationModel.fromJson(item);
-          notifications.add(notification);
-        } catch (e) {
-          print('Ошибка парсинга: $e');
-        }
+    try {
+      final userId = SupabaseConfig.auth.currentUser?.id;
+      if (userId == null) {
+        setState(() => _isLoading = false);
+        return;
       }
 
-      setState(() {
-        _notifications = notifications;
-        _isLoading = false;
-      });
-      
-      print('Загружено ${notifications.length} уведомлений');
+      final response = await SupabaseConfig.client
+          .from('notifications')
+          .select('''
+            *,
+            profiles!notifications_actor_id_fkey(username, avatar_url)
+          ''')
+          .eq('user_id', userId)
+          .order('created_at', ascending: false);
+
+      if (response != null && response is List) {
+        List<NotificationModel> notifications = [];
+        int unread = 0;
+
+        for (var item in response) {
+          final notification = NotificationModel.fromJson(item);
+          notifications.add(notification);
+          if (!notification.isRead) unread++;
+        }
+
+        setState(() {
+          _notifications = notifications;
+          _unreadCount = unread;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      print('Ошибка загрузки уведомлений: $e');
+      setState(() => _isLoading = false);
     }
-  } catch (e, stackTrace) {
-    print('Ошибка загрузки уведомлений: $e');
-    print('Stack trace: $stackTrace');
-    setState(() => _isLoading = false);
   }
-}
 
   Future<void> _markAsRead(NotificationModel notification) async {
     if (notification.isRead) return;
@@ -105,7 +87,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
             createdAt: notification.createdAt,
             actorProfile: notification.actorProfile,
           );
-          _unreadCount = _unreadCount > 0 ? _unreadCount - 1 : 0;
+          if (_unreadCount > 0) _unreadCount--;
         }
       });
     } catch (e) {
@@ -124,22 +106,23 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           .eq('user_id', userId)
           .eq('is_read', false);
 
-      for (var i = 0; i < _notifications.length; i++) {
-        _notifications[i] = NotificationModel(
-          id: _notifications[i].id,
-          userId: _notifications[i].userId,
-          actorId: _notifications[i].actorId,
-          type: _notifications[i].type,
-          postId: _notifications[i].postId,
-          commentId: _notifications[i].commentId,
-          message: _notifications[i].message,
-          isRead: true,
-          createdAt: _notifications[i].createdAt,
-          actorProfile: _notifications[i].actorProfile,
-        );
-      }
-
       setState(() {
+        for (var i = 0; i < _notifications.length; i++) {
+          if (!_notifications[i].isRead) {
+            _notifications[i] = NotificationModel(
+              id: _notifications[i].id,
+              userId: _notifications[i].userId,
+              actorId: _notifications[i].actorId,
+              type: _notifications[i].type,
+              postId: _notifications[i].postId,
+              commentId: _notifications[i].commentId,
+              message: _notifications[i].message,
+              isRead: true,
+              createdAt: _notifications[i].createdAt,
+              actorProfile: _notifications[i].actorProfile,
+            );
+          }
+        }
         _unreadCount = 0;
       });
 
@@ -168,8 +151,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) =>
-                OtherProfileScreen(userId: notification.actorId),
+            builder: (context) => OtherProfileScreen(userId: notification.actorId),
           ),
         );
         break;
@@ -179,8 +161,7 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) =>
-                  PostDetailScreen(postId: notification.postId!),
+              builder: (context) => PostDetailScreen(postId: notification.postId!),
             ),
           );
         }
@@ -221,127 +202,115 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
     );
   }
 
+  Widget _buildNotificationItem(NotificationModel notification) {
+    final actorProfile = notification.actorProfile;
+    final actorUsername = actorProfile != null
+        ? (actorProfile['username']?.toString() ?? 'Пользователь')
+        : 'Пользователь';
+    final actorAvatar = actorProfile?['avatar_url']?.toString();
 
-Widget _buildNotificationItem(NotificationModel notification) {
-  final actorProfile = notification.actorProfile;
-  final actorUsername = actorProfile != null 
-      ? (actorProfile['username']?.toString() ?? 'Пользователь')
-      : 'Пользователь';
-  final actorAvatar = actorProfile?['avatar_url']?.toString();
-
-  return GestureDetector(
-    onTap: () => _handleNotificationTap(notification),
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: notification.isRead ? Colors.white : Colors.blue[50],
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
-        ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              width: 40,
-              height: 40,
-              decoration: BoxDecoration(
-                color: notification.iconColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Icon(
-                notification.icon,
-                color: notification.iconColor,
-                size: 20,
-              ),
-            ),
-            const SizedBox(width: 12),
-            
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  RichText(
-                    text: TextSpan(
-                      style: TextStyle(
-                        color: Colors.black87,
-                        fontSize: 14,
-                        fontWeight: notification.isRead 
-                            ? FontWeight.normal 
-                            : FontWeight.w600,
-                      ),
-                      children: [
-                        TextSpan(
-                          text: '@$actorUsername ',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        TextSpan(text: notification.message),
-                      ],
-                    ),
-                  ),
-                  
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      if (actorAvatar != null && actorAvatar.isNotEmpty)
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundImage: NetworkImage(actorAvatar),
-                        )
-                      else
-                        CircleAvatar(
-                          radius: 12,
-                          backgroundColor: Colors.grey[200],
-                          child: const Icon(
-                            Icons.person,
-                            size: 12,
-                            color: Colors.grey,
-                          ),
-                        ),
-                      
-                      const SizedBox(width: 8),
-                      
-                      Icon(
-                        Icons.access_time,
-                        size: 12,
-                        color: Colors.grey[500],
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        notification.timeAgo,
-                        style: TextStyle(
-                          color: Colors.grey[500],
-                          fontSize: 12,
-                        ),
-                      ),
-                      const Spacer(),
-                      
-                      if (!notification.isRead)
-                        Container(
-                          width: 8,
-                          height: 8,
-                          decoration: const BoxDecoration(
-                            color: Colors.blueAccent,
-                            shape: BoxShape.circle,
-                          ),
-                        ),
-                    ],
-                  ),
-                ],
-              ),
+    return GestureDetector(
+      onTap: () => _handleNotificationTap(notification),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 8),
+        decoration: BoxDecoration(
+          color: notification.isRead ? Colors.white : Colors.grey[50],
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
             ),
           ],
+          border: Border.all(
+            color: Colors.grey[200]!,
+            width: 1,
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: notification.iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  notification.icon,
+                  color: notification.iconColor,
+                  size: 20,
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    RichText(
+                      text: TextSpan(
+                        style: TextStyle(
+                          color: Colors.black87,
+                          fontSize: 14,
+                          fontWeight: notification.isRead
+                              ? FontWeight.normal
+                              : FontWeight.w600,
+                        ),
+                        children: [
+                          TextSpan(
+                            text: '@$actorUsername ',
+                            style: const TextStyle(fontWeight: FontWeight.w600),
+                          ),
+                          TextSpan(text: notification.message),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        if (actorAvatar != null && actorAvatar.isNotEmpty)
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundImage: NetworkImage(actorAvatar),
+                          )
+                        else
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Colors.grey[200],
+                            child: const Icon(Icons.person, size: 12, color: Colors.grey),
+                          ),
+                        const SizedBox(width: 8),
+                        Icon(Icons.access_time, size: 12, color: Colors.grey[500]),
+                        const SizedBox(width: 4),
+                        Text(
+                          notification.timeAgo,
+                          style: TextStyle(color: Colors.grey[500], fontSize: 12),
+                        ),
+                        const Spacer(),
+                        if (!notification.isRead)
+                          Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.black87,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -352,10 +321,7 @@ Widget _buildNotificationItem(NotificationModel notification) {
         elevation: 0.5,
         title: const Text(
           'Уведомления',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
         ),
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
@@ -368,23 +334,21 @@ Widget _buildNotificationItem(NotificationModel notification) {
               icon: const Icon(Icons.done_all, size: 18),
               label: const Text('Прочитать все'),
               style: TextButton.styleFrom(
-                foregroundColor: Colors.blueAccent,
+                foregroundColor: Colors.black87,
               ),
             ),
         ],
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Colors.blueAccent,
-              ),
+              child: CircularProgressIndicator(color: Colors.black87),
             )
           : _notifications.isEmpty
               ? _buildEmptyState()
               : RefreshIndicator(
                   onRefresh: _loadNotifications,
                   backgroundColor: Colors.white,
-                  color: Colors.blueAccent,
+                  color: Colors.black87,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _notifications.length,

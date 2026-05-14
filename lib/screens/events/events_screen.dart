@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:vroom/supabase/supabase_config.dart';
 import 'package:intl/intl.dart';
 import 'edit_event_screen.dart';
+import 'package:vroom/screens/events/event_detail_screen.dart';
 
 class EventsScreen extends StatefulWidget {
   const EventsScreen({super.key});
@@ -14,10 +15,19 @@ class _EventsScreenState extends State<EventsScreen> {
   List<Map<String, dynamic>> _events = [];
   List<Map<String, dynamic>> _filteredEvents = [];
   Set<int> _registeredEvents = {};
+  Map<int, int> _participantsCounts = {};
   bool _isLoading = true;
   bool _showOnlyRegistered = false;
   String _selectedCategory = 'Все';
-  List<String> _categories = ['Все', 'Встречи', 'Гонки', 'Выставки', 'Благотворительность'];
+  String? _error; // Сообщение об ошибке загрузки
+
+  List<String> _categories = [
+    'Все',
+    'Встречи',
+    'Гонки',
+    'Выставки',
+    'Благотворительность'
+  ];
 
   @override
   void initState() {
@@ -27,6 +37,11 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   Future<void> _loadEvents() async {
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+
     try {
       final response = await SupabaseConfig.client
           .from('events')
@@ -36,14 +51,42 @@ class _EventsScreenState extends State<EventsScreen> {
           ''')
           .order('event_date', ascending: true);
 
+      final events = List<Map<String, dynamic>>.from(response);
       setState(() {
-        _events = List<Map<String, dynamic>>.from(response);
-        _applyFilters();
-        _isLoading = false;
+        _events = events;
       });
-    } catch (e) {
+
+      await _loadParticipantsCounts();
+      _applyFilters();
       setState(() => _isLoading = false);
+    } catch (e) {
       print('Error loading events: $e');
+      setState(() {
+        _isLoading = false;
+        _error = 'Не удалось загрузить мероприятия. Проверьте подключение и попробуйте снова.';
+      });
+    }
+  }
+
+  Future<void> _loadParticipantsCounts() async {
+    if (_events.isEmpty) return;
+    final eventIds = _events.map((e) => e['id'] as int).toList();
+    try {
+      final response = await SupabaseConfig.client
+          .from('event_registrations')
+          .select('event_id')
+          .eq('status', 'registered')
+          .inFilter('event_id', eventIds);
+
+      final counts = <int, int>{};
+      for (final row in response) {
+        final eid = row['event_id'] as int;
+        counts[eid] = (counts[eid] ?? 0) + 1;
+      }
+      _participantsCounts = counts;
+    } catch (e) {
+      print('Error loading participants counts: $e');
+      _participantsCounts = {};
     }
   }
 
@@ -59,8 +102,8 @@ class _EventsScreenState extends State<EventsScreen> {
           .eq('status', 'registered');
 
       setState(() {
-        _registeredEvents = Set.from(
-            response.map((reg) => reg['event_id'] as int));
+        _registeredEvents =
+            Set.from(response.map((reg) => reg['event_id'] as int));
       });
     } catch (e) {
       print('Error loading user registrations: $e');
@@ -69,24 +112,26 @@ class _EventsScreenState extends State<EventsScreen> {
 
   void _applyFilters() {
     List<Map<String, dynamic>> filtered = List.from(_events);
-    
+
     final now = DateTime.now();
     filtered = filtered.where((event) {
       final eventDate = DateTime.parse(event['event_date']);
       return eventDate.isAfter(now) || eventDate.isAtSameMomentAs(now);
     }).toList();
-    
+
     if (_showOnlyRegistered) {
-      filtered = filtered.where((event) => _registeredEvents.contains(event['id'])).toList();
+      filtered = filtered
+          .where((event) => _registeredEvents.contains(event['id']))
+          .toList();
     }
-    
+
     if (_selectedCategory != 'Все') {
       filtered = filtered.where((event) {
         final category = event['category'] ?? '';
         return category == _selectedCategory;
       }).toList();
     }
-    
+
     setState(() {
       _filteredEvents = filtered;
     });
@@ -99,7 +144,10 @@ class _EventsScreenState extends State<EventsScreen> {
 
   Future<void> _registerForEvent(int eventId) async {
     final userId = SupabaseConfig.auth.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      _showErrorSnackBar('Войдите, чтобы записаться на мероприятие');
+      return;
+    }
 
     try {
       await SupabaseConfig.client.from('event_registrations').insert({
@@ -110,23 +158,13 @@ class _EventsScreenState extends State<EventsScreen> {
 
       setState(() {
         _registeredEvents.add(eventId);
+        _participantsCounts[eventId] =
+            (_participantsCounts[eventId] ?? 0) + 1;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Вы успешно записались на мероприятие!'),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSuccessSnackBar('Вы успешно записались на мероприятие!');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка записи: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showErrorSnackBar('Ошибка записи: $e');
     }
   }
 
@@ -143,23 +181,15 @@ class _EventsScreenState extends State<EventsScreen> {
 
       setState(() {
         _registeredEvents.remove(eventId);
+        if (_participantsCounts.containsKey(eventId)) {
+          _participantsCounts[eventId] =
+              (_participantsCounts[eventId]! - 1).clamp(0, 999999);
+        }
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Вы отменили запись на мероприятие'),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSuccessSnackBar('Вы отменили запись на мероприятие');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка отмены записи: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showErrorSnackBar('Ошибка отмены записи: $e');
     }
   }
 
@@ -198,32 +228,37 @@ class _EventsScreenState extends State<EventsScreen> {
     if (confirmed != true) return;
 
     try {
-      await SupabaseConfig.client
-          .from('events')
-          .delete()
-          .eq('id', eventId);
+      await SupabaseConfig.client.from('events').delete().eq('id', eventId);
 
       setState(() {
         _events.removeWhere((event) => event['id'] == eventId);
         _applyFilters();
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text('Мероприятие удалено'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showSuccessSnackBar('Мероприятие удалено');
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Ошибка удаления: $e'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      _showErrorSnackBar('Ошибка удаления: $e');
     }
+  }
+
+  void _showSuccessSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.green,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _showErrorSnackBar(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.red,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   void _showFilterDialog() {
@@ -260,7 +295,6 @@ class _EventsScreenState extends State<EventsScreen> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  
                   const Text(
                     'Категория',
                     style: TextStyle(
@@ -278,13 +312,14 @@ class _EventsScreenState extends State<EventsScreen> {
                         label: Text(
                           category,
                           style: TextStyle(
-                            color: _selectedCategory == category 
-                                ? Colors.white 
+                            color: _selectedCategory == category
+                                ? Colors.white
                                 : Colors.black87,
                           ),
                         ),
                         selected: _selectedCategory == category,
-                        selectedColor: Colors.blueAccent,
+                        selectedColor: Colors.black87,
+                        checkmarkColor: Colors.white,
                         backgroundColor: Colors.grey[200],
                         onSelected: (selected) {
                           setState(() {
@@ -294,25 +329,21 @@ class _EventsScreenState extends State<EventsScreen> {
                       );
                     }).toList(),
                   ),
-                  
                   const SizedBox(height: 20),
-                  
                   SwitchListTile(
                     title: const Text(
                       'Только записанные',
                       style: TextStyle(color: Colors.black87),
                     ),
                     value: _showOnlyRegistered,
-                    activeColor: Colors.blueAccent,
+                    activeColor: Colors.black87,
                     onChanged: (value) {
                       setState(() {
                         _showOnlyRegistered = value;
                       });
                     },
                   ),
-                  
                   const SizedBox(height: 20),
-                  
                   Row(
                     children: [
                       Expanded(
@@ -324,8 +355,8 @@ class _EventsScreenState extends State<EventsScreen> {
                             });
                           },
                           style: OutlinedButton.styleFrom(
-                            foregroundColor: Colors.blueAccent,
-                            side: const BorderSide(color: Colors.blueAccent),
+                            foregroundColor: Colors.black87,
+                            side: const BorderSide(color: Colors.black87),
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
@@ -342,11 +373,13 @@ class _EventsScreenState extends State<EventsScreen> {
                             Navigator.pop(context);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blueAccent,
+                            backgroundColor: Colors.black87,
+                            foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(
                               borderRadius: BorderRadius.circular(10),
                             ),
                             padding: const EdgeInsets.symmetric(vertical: 16),
+                            elevation: 0,
                           ),
                           child: const Text('Применить'),
                         ),
@@ -366,7 +399,8 @@ class _EventsScreenState extends State<EventsScreen> {
   @override
   Widget build(BuildContext context) {
     final userId = SupabaseConfig.auth.currentUser?.id;
-    final hasActiveFilters = _showOnlyRegistered || _selectedCategory != 'Все';
+    final hasActiveFilters =
+        _showOnlyRegistered || _selectedCategory != 'Все';
 
     return Scaffold(
       backgroundColor: Colors.white,
@@ -380,11 +414,12 @@ class _EventsScreenState extends State<EventsScreen> {
             color: Colors.black87,
           ),
         ),
+        iconTheme: const IconThemeData(color: Colors.black87),
         actions: [
           IconButton(
             icon: Stack(
               children: [
-                const Icon(Icons.filter_list, color: Colors.blueAccent),
+                const Icon(Icons.filter_list, color: Colors.black87),
                 if (hasActiveFilters)
                   Positioned(
                     right: 0,
@@ -409,124 +444,146 @@ class _EventsScreenState extends State<EventsScreen> {
             onPressed: _showFilterDialog,
           ),
           IconButton(
-            icon: const Icon(Icons.add, color: Colors.blueAccent),
+            icon: const Icon(Icons.add, color: Colors.black87),
             onPressed: () async {
               final result = await Navigator.pushNamed(context, '/add_event');
               if (result == true) {
                 await _refreshEvents();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: const Text('Мероприятие создано!'),
-                    backgroundColor: Colors.green,
-                    behavior: SnackBarBehavior.floating,
-                  ),
-                );
+                _showSuccessSnackBar('Мероприятие создано!');
               }
             },
           ),
         ],
       ),
       body: _isLoading
-          ? Center(
-              child: CircularProgressIndicator(
-                color: Colors.blueAccent,
-              ),
-            )
-          : RefreshIndicator(
-              onRefresh: _refreshEvents,
-              backgroundColor: Colors.white,
-              color: Colors.blueAccent,
-              child: Column(
-                children: [
-                  if (hasActiveFilters)
-                    Container(
-                      color: Colors.grey[50],
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            if (_showOnlyRegistered)
-                              _buildFilterChip('Только записанные'),
-                            if (_selectedCategory != 'Все')
-                              _buildFilterChip(_selectedCategory),
-                          ],
-                        ),
-                      ),
-                    ),
-                  Expanded(
-                    child: _filteredEvents.isEmpty
-                        ? Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+          ? const Center(
+              child: CircularProgressIndicator(color: Colors.black87))
+          : _error != null
+              ? _buildErrorView()
+              : RefreshIndicator(
+                  onRefresh: _refreshEvents,
+                  backgroundColor: Colors.white,
+                  color: Colors.black87,
+                  child: Column(
+                    children: [
+                      if (hasActiveFilters)
+                        Container(
+                          color: Colors.grey[50],
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 16, vertical: 8),
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
                               children: [
-                                Icon(
-                                  Icons.event_note,
-                                  size: 80,
-                                  color: Colors.grey[300],
-                                ),
-                                const SizedBox(height: 20),
-                                Text(
-                                  'Мероприятия не найдены',
-                                  style: TextStyle(
-                                    fontSize: 20,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.grey[500],
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(
-                                      horizontal: 40.0),
-                                  child: Text(
-                                    hasActiveFilters
-                                        ? 'Попробуйте изменить фильтры'
-                                        : 'Пока нет мероприятий. Создайте первое!',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: Colors.grey[500],
-                                    ),
-                                  ),
-                                ),
-                                if (hasActiveFilters)
-                                  Padding(
-                                    padding: const EdgeInsets.only(top: 20),
-                                    child: TextButton(
-                                      onPressed: () {
-                                        setState(() {
-                                          _showOnlyRegistered = false;
-                                          _selectedCategory = 'Все';
-                                        });
-                                        _applyFilters();
-                                      },
-                                      child: const Text(
-                                        'Сбросить фильтры',
-                                        style: TextStyle(
-                                          color: Colors.blueAccent,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
+                                if (_showOnlyRegistered)
+                                  _buildFilterChip('Только записанные'),
+                                if (_selectedCategory != 'Все')
+                                  _buildFilterChip(_selectedCategory),
                               ],
                             ),
-                          )
-                        : ListView.builder(
-                            padding: const EdgeInsets.all(16.0),
-                            itemCount: _filteredEvents.length,
-                            itemBuilder: (context, index) {
-                              final event = _filteredEvents[index];
-                              final isCreator = userId == event['creator_id'];
-                              final isRegistered = _registeredEvents.contains(event['id']);
-                              return _buildEventCard(event, isCreator, isRegistered);
-                            },
                           ),
+                        ),
+                      Expanded(
+                        child: _filteredEvents.isEmpty
+                            ? Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(Icons.event_note,
+                                        size: 80, color: Colors.grey[300]),
+                                    const SizedBox(height: 20),
+                                    Text(
+                                      'Мероприятия не найдены',
+                                      style: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.grey[500],
+                                      ),
+                                    ),
+                                    const SizedBox(height: 10),
+                                    Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 40.0),
+                                      child: Text(
+                                        hasActiveFilters
+                                            ? 'Попробуйте изменить фильтры'
+                                            : 'Пока нет мероприятий. Создайте первое!',
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(color: Colors.grey[500]),
+                                      ),
+                                    ),
+                                    if (hasActiveFilters)
+                                      Padding(
+                                        padding: const EdgeInsets.only(top: 20),
+                                        child: TextButton(
+                                          onPressed: () {
+                                            setState(() {
+                                              _showOnlyRegistered = false;
+                                              _selectedCategory = 'Все';
+                                            });
+                                            _applyFilters();
+                                          },
+                                          child: const Text(
+                                            'Сбросить фильтры',
+                                            style:
+                                                TextStyle(color: Colors.black87),
+                                          ),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              )
+                            : ListView.builder(
+                                padding: const EdgeInsets.all(16.0),
+                                itemCount: _filteredEvents.length,
+                                itemBuilder: (context, index) {
+                                  final event = _filteredEvents[index];
+                                  final isCreator =
+                                      userId == event['creator_id'];
+                                  final isRegistered =
+                                      _registeredEvents.contains(event['id']);
+                                  return _buildEventCard(
+                                      event, isCreator, isRegistered);
+                                },
+                              ),
+                      ),
+                    ],
                   ),
-                ],
+                ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.cloud_off, size: 80, color: Colors.grey[300]),
+            const SizedBox(height: 20),
+            Text(
+              _error!,
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 20),
+            ElevatedButton.icon(
+              onPressed: _refreshEvents,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Повторить'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.black87,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                elevation: 0,
               ),
             ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -536,13 +593,10 @@ class _EventsScreenState extends State<EventsScreen> {
       child: Chip(
         label: Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: Colors.white,
-          ),
+          style: const TextStyle(fontSize: 12, color: Colors.white),
         ),
-        backgroundColor: Colors.blueAccent,
-        deleteIcon: const Icon(Icons.close, size: 16),
+        backgroundColor: Colors.black87,
+        deleteIcon: const Icon(Icons.close, size: 16, color: Colors.white70),
         onDeleted: () {
           if (label == 'Только записанные') {
             _showOnlyRegistered = false;
@@ -555,339 +609,468 @@ class _EventsScreenState extends State<EventsScreen> {
     );
   }
 
-  Widget _buildEventCard(
-      Map<String, dynamic> event, bool isCreator, bool isRegistered) {
-    final eventDate = DateTime.parse(event['event_date']);
-    final formattedDate = DateFormat('dd.MM.yyyy HH:mm').format(eventDate);
-    final currentUserId = SupabaseConfig.auth.currentUser?.id;
-    final daysUntilEvent = eventDate.difference(DateTime.now()).inDays;
-    final hoursUntilEvent = eventDate.difference(DateTime.now()).inHours;
+Widget _buildEventCard(
+    Map<String, dynamic> event, bool isCreator, bool isRegistered) {
+  final eventDate = DateTime.parse(event['event_date']);
+  final formattedDate = DateFormat('dd MMMM yyyy, HH:mm', 'ru').format(eventDate);
+  final dayOfMonth = eventDate.day.toString().padLeft(2, '0');
+  final monthAbbr = DateFormat('MMM', 'ru').format(eventDate);
+  final daysUntilEvent = eventDate.difference(DateTime.now()).inDays;
+  final participants = _participantsCounts[event['id']] ?? 0;
+  final maxParticipants = event['max_participants'];
+  final category = event['category'] ?? 'Другое';
+  final categoryColor = _getCategoryColor(category);
+  final currentUserId = SupabaseConfig.auth.currentUser?.id;
+  final description = event['description'];
 
-    return Container(
+  return GestureDetector(
+    onTap: () {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => EventDetailScreen(eventId: event['id']),
+        ),
+      );
+    },
+    child: Container(
       margin: const EdgeInsets.only(bottom: 16.0),
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16.0),
+        borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
+            color: Colors.grey.withOpacity(0.08),
+            blurRadius: 20,
+            offset: const Offset(0, 4),
           ),
         ],
-        border: Border.all(
-          color: Colors.grey[200]!,
-          width: 1,
-        ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.blue[50],
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(16.0),
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Container(
+              width: 4,
+              decoration: BoxDecoration(
+                color: categoryColor,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(12),
+                  bottomLeft: Radius.circular(12),
+                ),
               ),
             ),
-            child: Row(
-              children: [
-                Icon(
-                  _getCategoryIcon(event['category']),
-                  color: Colors.blueAccent,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        event['title'],
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black87,
-                        ),
-                      ),
-                      if (event['category'] != null)
-                        Text(
-                          event['category'],
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                    ],
-                  ),
-                ),
-                if (isCreator)
-                  IconButton(
-                    onPressed: () {
-                      showModalBottomSheet(
-                        context: context,
-                        backgroundColor: Colors.white,
-                        shape: const RoundedRectangleBorder(
-                          borderRadius: BorderRadius.vertical(
-                              top: Radius.circular(20)),
-                        ),
-                        builder: (context) {
-                          return SafeArea(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                ListTile(
-                                  leading: const Icon(Icons.edit, color: Colors.blueAccent),
-                                  title: const Text('Редактировать'),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _editEvent(event);
-                                  },
-                                ),
-                                ListTile(
-                                  leading: const Icon(Icons.delete, color: Colors.red),
-                                  title: const Text('Удалить', style: TextStyle(color: Colors.red)),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _deleteEvent(event['id']);
-                                  },
-                                ),
-                                const SizedBox(height: 10),
-                              ],
-                            ),
-                          );
-                        },
-                      );
-                    },
-                    icon: const Icon(Icons.more_vert, color: Colors.grey),
-                  ),
-              ],
-            ),
-          ),
-
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.calendar_today,
-                      size: 16,
-                      color: Colors.grey[600],
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      formattedDate,
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 14,
-                      ),
-                    ),
-                    const Spacer(),
-                    if (daysUntilEvent <= 7 && daysUntilEvent >= 0)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 8, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.orange[100]!),
-                        ),
-                        child: Text(
-                          daysUntilEvent == 0 
-                              ? 'Сегодня' 
-                              : 'Через $daysUntilEvent дн.',
-                          style: TextStyle(
-                            color: Colors.orange[800],
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-
-                if (event['location'] != null && event['location'].isNotEmpty)
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Icon(
-                        Icons.location_on,
-                        size: 16,
-                        color: Colors.grey[600],
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          event['location'],
-                          style: const TextStyle(
-                            color: Colors.black87,
-                            fontSize: 14,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-
-                if (event['description'] != null && event['description'].isNotEmpty)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 12.0),
-                    child: Text(
-                      event['description'],
-                      style: const TextStyle(
-                        color: Colors.black87,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-
-                if (event['profiles'] != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 16.0),
-                    child: Row(
+                    Row(
                       children: [
-                        CircleAvatar(
-                          radius: 16,
-                          backgroundColor: Colors.grey[200],
-                          backgroundImage: event['profiles']?['avatar_url'] != null
-                              ? NetworkImage(event['profiles']['avatar_url'])
-                              : null,
-                          child: event['profiles']?['avatar_url'] == null
-                              ? Icon(
-                                  Icons.person,
-                                  size: 16,
-                                  color: Colors.grey[400],
-                                )
-                              : null,
+                        Container(
+                          width: 44,
+                          height: 44,
+                          decoration: BoxDecoration(
+                            color: categoryColor.withOpacity(0.15),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: Icon(
+                            _getCategoryIcon(category),
+                            color: categoryColor,
+                            size: 24,
+                          ),
                         ),
                         const SizedBox(width: 12),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Организатор',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.grey,
-                              ),
-                            ),
-                            Text(
-                              '@${event['profiles']?['username'] ?? 'Неизвестен'}', 
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.black87,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-              ],
-            ),
-          ),
-
-          Container(
-            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-            child: currentUserId == null
-                ? Container(
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[100],
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    child: const Center(
-                      child: Text(
-                        'Войдите, чтобы записаться',
-                        style: TextStyle(color: Colors.grey),
-                      ),
-                    ),
-                  )
-                : isCreator
-                    ? Container(
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                        decoration: BoxDecoration(
-                          color: Colors.blue[50],
-                          borderRadius: BorderRadius.circular(10.0),
-                          border: Border.all(color: Colors.blue[100]!),
-                        ),
-                        child: const Center(
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Icon(Icons.star, color: Colors.blueAccent, size: 18),
-                              SizedBox(width: 8),
                               Text(
-                                'Вы организатор',
+                                event['title'],
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                category,
                                 style: TextStyle(
-                                  color: Colors.blueAccent,
-                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                      )
-                    : isRegistered
-                        ? Container(
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.green[50],
-                              borderRadius: BorderRadius.circular(10.0),
-                              border: Border.all(color: Colors.green[100]!),
+                        if (isCreator)
+                          InkWell(
+                            borderRadius: BorderRadius.circular(8),
+                            onTap: () {
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: Colors.white,
+                                shape: const RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.vertical(
+                                      top: Radius.circular(20)),
+                                ),
+                                builder: (context) {
+                                  return SafeArea(
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ListTile(
+                                          leading: const Icon(Icons.edit,
+                                              color: Colors.black87),
+                                          title: const Text('Редактировать'),
+                                          onTap: () {
+                                            Navigator.pop(context);
+                                            _editEvent(event);
+                                          },
+                                        ),
+                                        ListTile(
+                                          leading: const Icon(Icons.delete,
+                                              color: Colors.red),
+                                          title: const Text('Удалить',
+                                              style:
+                                                  TextStyle(color: Colors.red)),
+                                          onTap: () {
+                                            Navigator.pop(context);
+                                            _deleteEvent(event['id']);
+                                          },
+                                        ),
+                                        const SizedBox(height: 10),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                            child: const Padding(
+                              padding: EdgeInsets.all(4.0),
+                              child: Icon(Icons.more_vert,
+                                  color: Colors.grey, size: 20),
                             ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Container(
+                          width: 50,
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          decoration: BoxDecoration(
+                            color: Colors.grey[100],
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Column(
+                            children: [
+                              Text(
+                                dayOfMonth,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              Text(
+                                monthAbbr,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                formattedDate,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                  color: Colors.black87,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              if (event['location'] != null &&
+                                  event['location'].isNotEmpty)
+                                Row(
+                                  children: [
+                                    Icon(Icons.location_on,
+                                        size: 14, color: Colors.grey[500]),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        event['location'],
+                                        style: TextStyle(
+                                          fontSize: 13,
+                                          color: Colors.grey[600],
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                            ],
+                          ),
+                        ),
+                        if (daysUntilEvent <= 7 && daysUntilEvent >= 0)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 10, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: daysUntilEvent == 0
+                                  ? Colors.green[50]
+                                  : Colors.orange[50],
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: daysUntilEvent == 0
+                                    ? Colors.green[200]!
+                                    : Colors.orange[200]!,
+                              ),
+                            ),
+                            child: Text(
+                              daysUntilEvent == 0
+                                  ? 'Сегодня'
+                                  : 'Через $daysUntilEvent дн.',
+                              style: TextStyle(
+                                color: daysUntilEvent == 0
+                                    ? Colors.green[700]
+                                    : Colors.orange[700],
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    if (description != null && description.toString().trim().isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12.0),
+                        child: Text(
+                          description,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: Colors.black87,
+                            height: 1.4,
+                          ),
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    Row(
+                      children: [
+                        Icon(Icons.people, size: 16, color: Colors.grey[500]),
+                        const SizedBox(width: 6),
+                        if (maxParticipants != null)
+                          RichText(
+                            text: TextSpan(
+                              style: DefaultTextStyle.of(context).style,
                               children: [
-                                const Icon(Icons.check_circle,
-                                    color: Colors.green, size: 18),
-                                const SizedBox(width: 8),
-                                const Text(
-                                  'Вы участвуете',
-                                  style: TextStyle(
-                                    color: Colors.green,
-                                    fontWeight: FontWeight.w600,
+                                TextSpan(
+                                  text: '$participants',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                    fontSize: 14,
                                   ),
                                 ),
-                                const Spacer(),
-                                TextButton(
-                                  onPressed: () => _unregisterFromEvent(event['id']),
-                                  child: const Text(
-                                    'Отменить',
-                                    style: TextStyle(color: Colors.red),
+                                TextSpan(
+                                  text: ' из $maxParticipants участников',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: Colors.grey[600],
                                   ),
                                 ),
                               ],
                             ),
                           )
-                        : ElevatedButton(
-                            onPressed: () {
-                              _registerForEvent(event['id']);
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.blueAccent,
-                              foregroundColor: Colors.white,
-                              minimumSize: const Size(double.infinity, 44),
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(10.0),
+                        else
+                          Row(
+                            children: [
+                              Text(
+                                '$participants',
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black87,
+                                  fontSize: 14,
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              'Записаться',
-                              style: TextStyle(
-                                fontWeight: FontWeight.w600,
+                              const SizedBox(width: 4),
+                              Text(
+                                'участников',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: Colors.grey[600],
+                                ),
                               ),
+                            ],
+                          ),
+                        const Spacer(),
+                        if (event['profiles'] != null) ...[
+                          CircleAvatar(
+                            radius: 12,
+                            backgroundColor: Colors.grey[200],
+                            backgroundImage:
+                                event['profiles']?['avatar_url'] != null
+                                    ? NetworkImage(
+                                        event['profiles']['avatar_url'])
+                                    : null,
+                            child: event['profiles']?['avatar_url'] == null
+                                ? Icon(Icons.person,
+                                    size: 12, color: Colors.grey[400])
+                                : null,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '@${event['profiles']?['username'] ?? 'Неизвестен'}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: Colors.grey[600],
                             ),
                           ),
-          ),
-        ],
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 16),
+                    currentUserId == null
+                        ? Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: const Center(
+                              child: Text(
+                                'Войдите, чтобы записаться',
+                                style:
+                                    TextStyle(color: Colors.grey, fontSize: 14),
+                              ),
+                            ),
+                          )
+                        : isCreator
+                            ? Container(
+                                width: double.infinity,
+                                padding:
+                                    const EdgeInsets.symmetric(vertical: 12),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[100],
+                                  borderRadius: BorderRadius.circular(8),
+                                  border:
+                                      Border.all(color: Colors.grey[300]!),
+                                ),
+                                child: const Center(
+                                  child: Text(
+                                    'Вы организатор',
+                                    style: TextStyle(
+                                      color: Colors.black87,
+                                      fontWeight: FontWeight.w600,
+                                      fontSize: 15,
+                                    ),
+                                  ),
+                                ),
+                              )
+                            : isRegistered
+                                ? Container(
+                                    width: double.infinity,
+                                    padding:
+                                        const EdgeInsets.symmetric(vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.green[50],
+                                      borderRadius: BorderRadius.circular(8),
+                                      border:
+                                          Border.all(color: Colors.green[200]!),
+                                    ),
+                                    child: Row(
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        const Icon(Icons.check_circle,
+                                            color: Colors.green, size: 18),
+                                        const SizedBox(width: 8),
+                                        const Expanded(
+                                          child: Text(
+                                            'Вы участвуете',
+                                            style: TextStyle(
+                                              color: Colors.green,
+                                              fontWeight: FontWeight.w600,
+                                              fontSize: 15,
+                                            ),
+                                          ),
+                                        ),
+                                        TextButton(
+                                          onPressed: () =>
+                                              _unregisterFromEvent(
+                                                  event['id']),
+                                          child: const Text(
+                                            'Отменить',
+                                            style:
+                                                TextStyle(color: Colors.red),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  )
+                                : SizedBox(
+                                    width: double.infinity,
+                                    child: ElevatedButton(
+                                      onPressed: () =>
+                                          _registerForEvent(event['id']),
+                                      style: ElevatedButton.styleFrom(
+                                        backgroundColor: Colors.black87,
+                                        foregroundColor: Colors.white,
+                                        padding: const EdgeInsets.symmetric(
+                                            vertical: 14),
+                                        shape: RoundedRectangleBorder(
+                                          borderRadius:
+                                              BorderRadius.circular(8),
+                                        ),
+                                        elevation: 0,
+                                      ),
+                                      child: const Text(
+                                        'Записаться',
+                                        style: TextStyle(
+                                          fontWeight: FontWeight.w600,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
-    );
+    ),
+  );
+}
+
+  Color _getCategoryColor(String? category) {
+    switch (category) {
+      case 'Встречи':
+        return const Color(0xFF4A90E2);
+      case 'Гонки':
+        return const Color(0xFFE25C4A);
+      case 'Выставки':
+        return const Color(0xFF9B59B6);
+      case 'Благотворительность':
+        return const Color(0xFF2ECC71);
+      default:
+        return Colors.grey;
+    }
   }
 
   IconData _getCategoryIcon(String? category) {

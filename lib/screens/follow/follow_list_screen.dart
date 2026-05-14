@@ -4,7 +4,7 @@ import 'package:vroom/supabase/supabase_config.dart';
 
 class FollowListScreen extends StatefulWidget {
   final String userId;
-  final String type; 
+  final String type;
   final String title;
 
   const FollowListScreen({
@@ -21,8 +21,8 @@ class FollowListScreen extends StatefulWidget {
 class _FollowListScreenState extends State<FollowListScreen> {
   List<Map<String, dynamic>> _users = [];
   bool _isLoading = true;
-  Map<String, bool> _followingStatus = {}; 
-  Map<String, bool> _friendshipStatus = {}; 
+  Map<String, bool> _followingStatus = {};
+  Map<String, bool> _friendshipStatus = {};
 
   @override
   void initState() {
@@ -83,15 +83,12 @@ class _FollowListScreenState extends State<FollowListScreen> {
       }
 
       await _loadFollowingStatus(users);
-      
       await _loadFriendshipStatus(users);
 
       setState(() {
         _users = users;
         _isLoading = false;
       });
-      
-      print('Загружено ${users.length} пользователей');
     } catch (e) {
       print('Error loading ${widget.type}: $e');
       setState(() => _isLoading = false);
@@ -104,7 +101,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
 
     try {
       final userIds = users.map((user) => user['id'] as String).toList();
-      
       if (userIds.isEmpty) return;
 
       final response = await SupabaseConfig.client
@@ -121,8 +117,6 @@ class _FollowListScreenState extends State<FollowListScreen> {
         final userId = user['id'] as String;
         _followingStatus[userId] = followingSet.contains(userId);
       }
-      
-      print('Статусы подписки загружены для ${followingSet.length} пользователей');
     } catch (e) {
       print('Error checking follow status: $e');
     }
@@ -135,32 +129,27 @@ class _FollowListScreenState extends State<FollowListScreen> {
     try {
       for (var user in users) {
         final userId = user['id'] as String;
-        
         if (currentUserId == userId) {
           _friendshipStatus[userId] = false;
           continue;
         }
-        
+
         final isFollowingResponse = await SupabaseConfig.client
             .from('follows')
             .select()
             .eq('follower_id', currentUserId)
             .eq('following_id', userId);
-        
         final isCurrentUserFollowing = isFollowingResponse.isNotEmpty;
-        
+
         final isFollowedBackResponse = await SupabaseConfig.client
             .from('follows')
             .select()
             .eq('follower_id', userId)
             .eq('following_id', currentUserId);
-        
         final isFollowedBack = isFollowedBackResponse.isNotEmpty;
-        
+
         _friendshipStatus[userId] = isCurrentUserFollowing && isFollowedBack;
       }
-      
-      print('Статусы дружбы загружены для ${_friendshipStatus.length} пользователей');
     } catch (e) {
       print('Error checking friendship status: $e');
     }
@@ -196,15 +185,12 @@ class _FollowListScreenState extends State<FollowListScreen> {
 
       setState(() {
         _followingStatus[userId] = !currentlyFollowing;
-        
         _checkFriendshipStatusForUser(userId);
       });
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            currentlyFollowing ? 'Вы отписались' : 'Вы подписались',
-          ),
+          content: Text(currentlyFollowing ? 'Вы отписались' : 'Вы подписались'),
           backgroundColor: currentlyFollowing ? Colors.grey : Colors.green,
         ),
       );
@@ -229,17 +215,15 @@ class _FollowListScreenState extends State<FollowListScreen> {
           .select()
           .eq('follower_id', currentUserId)
           .eq('following_id', userId);
-      
       final isCurrentUserFollowing = isFollowingResponse.isNotEmpty;
-      
+
       final isFollowedBackResponse = await SupabaseConfig.client
           .from('follows')
           .select()
           .eq('follower_id', userId)
           .eq('following_id', currentUserId);
-      
       final isFollowedBack = isFollowedBackResponse.isNotEmpty;
-      
+
       setState(() {
         _friendshipStatus[userId] = isCurrentUserFollowing && isFollowedBack;
       });
@@ -278,9 +262,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
       ),
       body: _isLoading
           ? const Center(
-              child: CircularProgressIndicator(
-                color: Colors.blueAccent,
-              ),
+              child: CircularProgressIndicator(color: Colors.black87),
             )
           : _users.isEmpty
               ? Center(
@@ -313,9 +295,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
                               ? 'Пользователи, которые подпишутся на вас, появятся здесь'
                               : 'Пользователи, на которых вы подпишетесь, появятся здесь',
                           textAlign: TextAlign.center,
-                          style: TextStyle(
-                            color: Colors.grey[500],
-                          ),
+                          style: TextStyle(color: Colors.grey[500]),
                         ),
                       ),
                     ],
@@ -324,7 +304,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
               : RefreshIndicator(
                   onRefresh: _loadUsers,
                   backgroundColor: Colors.white,
-                  color: Colors.blueAccent,
+                  color: Colors.black87,
                   child: ListView.builder(
                     padding: const EdgeInsets.all(16),
                     itemCount: _users.length,
@@ -335,10 +315,19 @@ class _FollowListScreenState extends State<FollowListScreen> {
                       final isFollowing = _followingStatus[user['id']] ?? false;
                       final isFriend = _friendshipStatus[user['id']] ?? false;
 
-                      return Card(
+                      return Container(
                         margin: const EdgeInsets.only(bottom: 12),
-                        shape: RoundedRectangleBorder(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
                           borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.grey.withOpacity(0.08),
+                              blurRadius: 10,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                          border: Border.all(color: Colors.grey[300]!),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -357,16 +346,11 @@ class _FollowListScreenState extends State<FollowListScreen> {
                                       ? NetworkImage(user['avatar_url'])
                                       : null,
                                   child: user['avatar_url'] == null
-                                      ? const Icon(
-                                          Icons.person,
-                                          color: Colors.grey,
-                                        )
+                                      ? const Icon(Icons.person, color: Colors.grey)
                                       : null,
                                 ),
                               ),
-                              
                               const SizedBox(width: 12),
-                              
                               Expanded(
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -378,10 +362,10 @@ class _FollowListScreenState extends State<FollowListScreen> {
                                         style: const TextStyle(
                                           fontWeight: FontWeight.w600,
                                           fontSize: 16,
+                                          color: Colors.black87,
                                         ),
                                       ),
                                     ),
-                                    
                                     if (user['bio'] != null && user['bio'].isNotEmpty)
                                       GestureDetector(
                                         onTap: () => _openUserProfile(user['id']),
@@ -401,9 +385,7 @@ class _FollowListScreenState extends State<FollowListScreen> {
                                   ],
                                 ),
                               ),
-                              
                               const SizedBox(width: 12),
-                              
                               Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
@@ -431,13 +413,10 @@ class _FollowListScreenState extends State<FollowListScreen> {
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: isFollowing
                                             ? Colors.grey[200]
-                                            : Colors.blueAccent,
+                                            : Colors.black87,
                                         foregroundColor: isFollowing
                                             ? Colors.black87
                                             : Colors.white,
-                                        side: isFollowing
-                                            ? BorderSide(color: Colors.grey[300]!)
-                                            : null,
                                         shape: RoundedRectangleBorder(
                                           borderRadius: BorderRadius.circular(20),
                                         ),
@@ -452,17 +431,14 @@ class _FollowListScreenState extends State<FollowListScreen> {
                                         style: const TextStyle(fontSize: 12),
                                       ),
                                     ),
-                                  
                                   if (!isCurrentUser && isFriend)
-                                    Center(
-                                      child: Padding(
-                                        padding: const EdgeInsets.only(top: 4.0),
-                                        child: Text(
-                                          'Друг',
-                                          style: TextStyle(
-                                            color: Colors.green[700],
-                                            fontSize: 10,
-                                          ),
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        'Друг',
+                                        style: TextStyle(
+                                          color: Colors.green[700],
+                                          fontSize: 10,
                                         ),
                                       ),
                                     ),
