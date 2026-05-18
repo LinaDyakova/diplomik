@@ -16,12 +16,24 @@ class _ServiceFilterSheetState extends State<ServiceFilterSheet> {
     {'value': 'wash', 'label': 'Мойка'},
     {'value': 'tire_service', 'label': 'Шиномонтаж'},
   ];
-  String _selectedType = 'all';
+  late String _selectedType;
 
   @override
   void initState() {
     super.initState();
     _selectedType = widget.selectedType ?? 'all';
+  }
+
+  void _resetAndClose() {
+    // Сбрасываем фильтр: передаём null (означает "все")
+    widget.onFilterChanged(null);
+    Navigator.pop(context);
+  }
+
+  void _applyAndClose() {
+    final newType = _selectedType == 'all' ? null : _selectedType;
+    widget.onFilterChanged(newType);
+    Navigator.pop(context);
   }
 
   @override
@@ -60,17 +72,20 @@ class _ServiceFilterSheetState extends State<ServiceFilterSheet> {
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
             children: [
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('Отмена', style: TextStyle(color: Colors.black87)),
+              // Кнопка Сбросить
+              OutlinedButton(
+                onPressed: _resetAndClose,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.black87,
+                  side: const BorderSide(color: Colors.black87),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: const Text('Сбросить'),
               ),
               const SizedBox(width: 12),
+              // Кнопка Применить (оставлена)
               ElevatedButton(
-                onPressed: () {
-                  final newType = _selectedType == 'all' ? null : _selectedType;
-                  widget.onFilterChanged(newType);
-                  Navigator.pop(context);
-                },
+                onPressed: _applyAndClose,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.black87,
                   foregroundColor: Colors.white,

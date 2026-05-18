@@ -96,6 +96,33 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   }
 
   Future<void> _markAllAsRead() async {
+    if (_unreadCount == 0) return;
+
+    // Подтверждение действия
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Отметить все как прочитанные?'),
+        content: const Text('Все уведомления будут отмечены прочитанными.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Отмена'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.black87,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Да'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
     final userId = SupabaseConfig.auth.currentUser?.id;
     if (userId == null) return;
 
@@ -328,15 +355,20 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
           onPressed: () => Navigator.pop(context),
         ),
         actions: [
-          if (_unreadCount > 0)
-            TextButton.icon(
-              onPressed: _markAllAsRead,
-              icon: const Icon(Icons.done_all, size: 18),
-              label: const Text('Прочитать все'),
-              style: TextButton.styleFrom(
-                foregroundColor: Colors.black87,
+          // Кнопка "Прочитать всё" отображается всегда, но неактивна, если нет непрочитанных
+          TextButton.icon(
+            onPressed: _unreadCount == 0 ? null : _markAllAsRead,
+            icon: Icon(Icons.done_all, size: 18, color: _unreadCount == 0 ? Colors.grey : Colors.black87),
+            label: Text(
+              'Прочитать всё',
+              style: TextStyle(
+                color: _unreadCount == 0 ? Colors.grey : Colors.black87,
               ),
             ),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.black87,
+            ),
+          ),
         ],
       ),
       body: _isLoading

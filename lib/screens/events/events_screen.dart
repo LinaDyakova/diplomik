@@ -19,7 +19,7 @@ class _EventsScreenState extends State<EventsScreen> {
   bool _isLoading = true;
   bool _showOnlyRegistered = false;
   String _selectedCategory = 'Все';
-  String? _error; // Сообщение об ошибке загрузки
+  String? _error;
 
   List<String> _categories = [
     'Все',
@@ -466,23 +466,7 @@ class _EventsScreenState extends State<EventsScreen> {
                   color: Colors.black87,
                   child: Column(
                     children: [
-                      if (hasActiveFilters)
-                        Container(
-                          color: Colors.grey[50],
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 16, vertical: 8),
-                          child: SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                if (_showOnlyRegistered)
-                                  _buildFilterChip('Только записанные'),
-                                if (_selectedCategory != 'Все')
-                                  _buildFilterChip(_selectedCategory),
-                              ],
-                            ),
-                          ),
-                        ),
+                      // Блок с отображением активных фильтров (чипов) удалён полностью
                       Expanded(
                         child: _filteredEvents.isEmpty
                             ? Center(
@@ -588,6 +572,7 @@ class _EventsScreenState extends State<EventsScreen> {
   }
 
   Widget _buildFilterChip(String label) {
+    // Этот метод больше не используется, но оставлен на случай, если он вызывается где-то ещё
     return Container(
       margin: const EdgeInsets.only(right: 8),
       child: Chip(
@@ -609,284 +594,306 @@ class _EventsScreenState extends State<EventsScreen> {
     );
   }
 
-Widget _buildEventCard(
-    Map<String, dynamic> event, bool isCreator, bool isRegistered) {
-  final eventDate = DateTime.parse(event['event_date']);
-  final formattedDate = DateFormat('dd MMMM yyyy, HH:mm', 'ru').format(eventDate);
-  final dayOfMonth = eventDate.day.toString().padLeft(2, '0');
-  final monthAbbr = DateFormat('MMM', 'ru').format(eventDate);
-  final daysUntilEvent = eventDate.difference(DateTime.now()).inDays;
-  final participants = _participantsCounts[event['id']] ?? 0;
-  final maxParticipants = event['max_participants'];
-  final category = event['category'] ?? 'Другое';
-  final categoryColor = _getCategoryColor(category);
-  final currentUserId = SupabaseConfig.auth.currentUser?.id;
-  final description = event['description'];
+  Widget _buildEventCard(
+      Map<String, dynamic> event, bool isCreator, bool isRegistered) {
+    final eventDate = DateTime.parse(event['event_date']);
+    final formattedDate = DateFormat('dd MMMM yyyy, HH:mm', 'ru').format(eventDate);
+    final dayOfMonth = eventDate.day.toString().padLeft(2, '0');
+    final monthAbbr = DateFormat('MMM', 'ru').format(eventDate);
+    final daysUntilEvent = eventDate.difference(DateTime.now()).inDays;
+    final participants = _participantsCounts[event['id']] ?? 0;
+    final maxParticipants = event['max_participants'];
+    final category = event['category'] ?? 'Другое';
+    final categoryColor = _getCategoryColor(category);
+    final currentUserId = SupabaseConfig.auth.currentUser?.id;
+    final description = event['description'];
 
-  return GestureDetector(
-    onTap: () {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => EventDetailScreen(eventId: event['id']),
-        ),
-      );
-    },
-    child: Container(
-      margin: const EdgeInsets.only(bottom: 16.0),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.grey.withOpacity(0.08),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => EventDetailScreen(eventId: event['id']),
           ),
-        ],
-      ),
-      child: IntrinsicHeight(
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Container(
-              width: 4,
-              decoration: BoxDecoration(
-                color: categoryColor,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(12),
-                  bottomLeft: Radius.circular(12),
+        );
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16.0),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.grey.withOpacity(0.08),
+              blurRadius: 20,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: IntrinsicHeight(
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Container(
+                width: 4,
+                decoration: BoxDecoration(
+                  color: categoryColor,
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(12),
+                    bottomLeft: Radius.circular(12),
+                  ),
                 ),
               ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: BoxDecoration(
-                            color: categoryColor.withOpacity(0.15),
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          child: Icon(
-                            _getCategoryIcon(category),
-                            color: categoryColor,
-                            size: 24,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                event['title'],
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                category,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (isCreator)
-                          InkWell(
-                            borderRadius: BorderRadius.circular(8),
-                            onTap: () {
-                              showModalBottomSheet(
-                                context: context,
-                                backgroundColor: Colors.white,
-                                shape: const RoundedRectangleBorder(
-                                  borderRadius: BorderRadius.vertical(
-                                      top: Radius.circular(20)),
-                                ),
-                                builder: (context) {
-                                  return SafeArea(
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        ListTile(
-                                          leading: const Icon(Icons.edit,
-                                              color: Colors.black87),
-                                          title: const Text('Редактировать'),
-                                          onTap: () {
-                                            Navigator.pop(context);
-                                            _editEvent(event);
-                                          },
-                                        ),
-                                        ListTile(
-                                          leading: const Icon(Icons.delete,
-                                              color: Colors.red),
-                                          title: const Text('Удалить',
-                                              style:
-                                                  TextStyle(color: Colors.red)),
-                                          onTap: () {
-                                            Navigator.pop(context);
-                                            _deleteEvent(event['id']);
-                                          },
-                                        ),
-                                        const SizedBox(height: 10),
-                                      ],
-                                    ),
-                                  );
-                                },
-                              );
-                            },
-                            child: const Padding(
-                              padding: EdgeInsets.all(4.0),
-                              child: Icon(Icons.more_vert,
-                                  color: Colors.grey, size: 20),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    Row(
-                      children: [
-                        Container(
-                          width: 50,
-                          padding: const EdgeInsets.symmetric(vertical: 4),
-                          decoration: BoxDecoration(
-                            color: Colors.grey[100],
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Column(
-                            children: [
-                              Text(
-                                dayOfMonth,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              Text(
-                                monthAbbr,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                formattedDate,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.black87,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              if (event['location'] != null &&
-                                  event['location'].isNotEmpty)
-                                Row(
-                                  children: [
-                                    Icon(Icons.location_on,
-                                        size: 14, color: Colors.grey[500]),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        event['location'],
-                                        style: TextStyle(
-                                          fontSize: 13,
-                                          color: Colors.grey[600],
-                                        ),
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                        if (daysUntilEvent <= 7 && daysUntilEvent >= 0)
+              Expanded(
+                child: Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
                           Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 10, vertical: 4),
+                            width: 44,
+                            height: 44,
                             decoration: BoxDecoration(
-                              color: daysUntilEvent == 0
-                                  ? Colors.green[50]
-                                  : Colors.orange[50],
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: daysUntilEvent == 0
-                                    ? Colors.green[200]!
-                                    : Colors.orange[200]!,
-                              ),
+                              color: categoryColor.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(12),
                             ),
-                            child: Text(
-                              daysUntilEvent == 0
-                                  ? 'Сегодня'
-                                  : 'Через $daysUntilEvent дн.',
-                              style: TextStyle(
-                                color: daysUntilEvent == 0
-                                    ? Colors.green[700]
-                                    : Colors.orange[700],
-                                fontSize: 12,
-                                fontWeight: FontWeight.w600,
-                              ),
+                            child: Icon(
+                              _getCategoryIcon(category),
+                              color: categoryColor,
+                              size: 24,
                             ),
                           ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    if (description != null && description.toString().trim().isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12.0),
-                        child: Text(
-                          description,
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: Colors.black87,
-                            height: 1.4,
-                          ),
-                          maxLines: 3,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    Row(
-                      children: [
-                        Icon(Icons.people, size: 16, color: Colors.grey[500]),
-                        const SizedBox(width: 6),
-                        if (maxParticipants != null)
-                          RichText(
-                            text: TextSpan(
-                              style: DefaultTextStyle.of(context).style,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                TextSpan(
-                                  text: '$participants',
+                                Text(
+                                  event['title'],
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  category,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          if (isCreator)
+                            InkWell(
+                              borderRadius: BorderRadius.circular(8),
+                              onTap: () {
+                                showModalBottomSheet(
+                                  context: context,
+                                  backgroundColor: Colors.white,
+                                  shape: const RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(20)),
+                                  ),
+                                  builder: (context) {
+                                    return SafeArea(
+                                      child: Column(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          ListTile(
+                                            leading: const Icon(Icons.edit,
+                                                color: Colors.black87),
+                                            title: const Text('Редактировать'),
+                                            onTap: () {
+                                              Navigator.pop(context);
+                                              _editEvent(event);
+                                            },
+                                          ),
+                                          ListTile(
+                                            leading: const Icon(Icons.delete,
+                                                color: Colors.red),
+                                            title: const Text('Удалить',
+                                                style:
+                                                    TextStyle(color: Colors.red)),
+                                            onTap: () {
+                                              Navigator.pop(context);
+                                              _deleteEvent(event['id']);
+                                            },
+                                          ),
+                                          const SizedBox(height: 10),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              child: const Padding(
+                                padding: EdgeInsets.all(4.0),
+                                child: Icon(Icons.more_vert,
+                                    color: Colors.grey, size: 20),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Container(
+                            width: 50,
+                            padding: const EdgeInsets.symmetric(vertical: 4),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Column(
+                              children: [
+                                Text(
+                                  dayOfMonth,
+                                  style: const TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                Text(
+                                  monthAbbr,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.grey[600],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  formattedDate,
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.black87,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                if (event['location'] != null &&
+                                    event['location'].isNotEmpty)
+                                  Row(
+                                    children: [
+                                      Icon(Icons.location_on,
+                                          size: 14, color: Colors.grey[500]),
+                                      const SizedBox(width: 4),
+                                      Flexible(
+                                        child: Text(
+                                          event['location'],
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            color: Colors.grey[600],
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                              ],
+                            ),
+                          ),
+                          if (daysUntilEvent <= 7 && daysUntilEvent >= 0)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: daysUntilEvent == 0
+                                    ? Colors.green[50]
+                                    : Colors.orange[50],
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: daysUntilEvent == 0
+                                      ? Colors.green[200]!
+                                      : Colors.orange[200]!,
+                                ),
+                              ),
+                              child: Text(
+                                daysUntilEvent == 0
+                                    ? 'Сегодня'
+                                    : 'Через $daysUntilEvent дн.',
+                                style: TextStyle(
+                                  color: daysUntilEvent == 0
+                                      ? Colors.green[700]
+                                      : Colors.orange[700],
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      if (description != null && description.toString().trim().isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 12.0),
+                          child: Text(
+                            description,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.black87,
+                              height: 1.4,
+                            ),
+                            maxLines: 3,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      Row(
+                        children: [
+                          Icon(Icons.people, size: 16, color: Colors.grey[500]),
+                          const SizedBox(width: 6),
+                          if (maxParticipants != null)
+                            RichText(
+                              text: TextSpan(
+                                style: DefaultTextStyle.of(context).style,
+                                children: [
+                                  TextSpan(
+                                    text: '$participants',
+                                    style: const TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.black87,
+                                      fontSize: 14,
+                                    ),
+                                  ),
+                                  TextSpan(
+                                    text: ' из $maxParticipants участников',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: Colors.grey[600],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            )
+                          else
+                            Row(
+                              children: [
+                                Text(
+                                  '$participants',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                     color: Colors.black87,
                                     fontSize: 14,
                                   ),
                                 ),
-                                TextSpan(
-                                  text: ' из $maxParticipants участников',
+                                const SizedBox(width: 4),
+                                Text(
+                                  'участников',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: Colors.grey[600],
@@ -894,169 +901,147 @@ Widget _buildEventCard(
                                 ),
                               ],
                             ),
-                          )
-                        else
-                          Row(
-                            children: [
-                              Text(
-                                '$participants',
-                                style: const TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.black87,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                'участников',
-                                style: TextStyle(
-                                  fontSize: 13,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                            ],
-                          ),
-                        const Spacer(),
-                        if (event['profiles'] != null) ...[
-                          CircleAvatar(
-                            radius: 12,
-                            backgroundColor: Colors.grey[200],
-                            backgroundImage:
-                                event['profiles']?['avatar_url'] != null
-                                    ? NetworkImage(
-                                        event['profiles']['avatar_url'])
-                                    : null,
-                            child: event['profiles']?['avatar_url'] == null
-                                ? Icon(Icons.person,
-                                    size: 12, color: Colors.grey[400])
-                                : null,
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            '@${event['profiles']?['username'] ?? 'Неизвестен'}',
-                            style: TextStyle(
-                              fontSize: 13,
-                              color: Colors.grey[600],
+                          const Spacer(),
+                          if (event['profiles'] != null) ...[
+                            CircleAvatar(
+                              radius: 12,
+                              backgroundColor: Colors.grey[200],
+                              backgroundImage:
+                                  event['profiles']?['avatar_url'] != null
+                                      ? NetworkImage(
+                                          event['profiles']['avatar_url'])
+                                      : null,
+                              child: event['profiles']?['avatar_url'] == null
+                                  ? Icon(Icons.person,
+                                      size: 12, color: Colors.grey[400])
+                                  : null,
                             ),
-                          ),
+                            const SizedBox(width: 6),
+                            Text(
+                              '@${event['profiles']?['username'] ?? 'Неизвестен'}',
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-                    currentUserId == null
-                        ? Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.symmetric(vertical: 12),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Center(
-                              child: Text(
-                                'Войдите, чтобы записаться',
-                                style:
-                                    TextStyle(color: Colors.grey, fontSize: 14),
+                      ),
+                      const SizedBox(height: 16),
+                      currentUserId == null
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: Colors.grey[100],
+                                borderRadius: BorderRadius.circular(8),
                               ),
-                            ),
-                          )
-                        : isCreator
-                            ? Container(
-                                width: double.infinity,
-                                padding:
-                                    const EdgeInsets.symmetric(vertical: 12),
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[100],
-                                  borderRadius: BorderRadius.circular(8),
-                                  border:
-                                      Border.all(color: Colors.grey[300]!),
+                              child: const Center(
+                                child: Text(
+                                  'Войдите, чтобы записаться',
+                                  style:
+                                      TextStyle(color: Colors.grey, fontSize: 14),
                                 ),
-                                child: const Center(
-                                  child: Text(
-                                    'Вы организатор',
-                                    style: TextStyle(
-                                      color: Colors.black87,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 15,
+                              ),
+                            )
+                          : isCreator
+                              ? Container(
+                                  width: double.infinity,
+                                  padding:
+                                      const EdgeInsets.symmetric(vertical: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[100],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border:
+                                        Border.all(color: Colors.grey[300]!),
+                                  ),
+                                  child: const Center(
+                                    child: Text(
+                                      'Вы организатор',
+                                      style: TextStyle(
+                                        color: Colors.black87,
+                                        fontWeight: FontWeight.w600,
+                                        fontSize: 15,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              )
-                            : isRegistered
-                                ? Container(
-                                    width: double.infinity,
-                                    padding:
-                                        const EdgeInsets.symmetric(vertical: 8),
-                                    decoration: BoxDecoration(
-                                      color: Colors.green[50],
-                                      borderRadius: BorderRadius.circular(8),
-                                      border:
-                                          Border.all(color: Colors.green[200]!),
-                                    ),
-                                    child: Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: [
-                                        const Icon(Icons.check_circle,
-                                            color: Colors.green, size: 18),
-                                        const SizedBox(width: 8),
-                                        const Expanded(
-                                          child: Text(
-                                            'Вы участвуете',
-                                            style: TextStyle(
-                                              color: Colors.green,
-                                              fontWeight: FontWeight.w600,
-                                              fontSize: 15,
+                                )
+                              : isRegistered
+                                  ? Container(
+                                      width: double.infinity,
+                                      padding:
+                                          const EdgeInsets.symmetric(vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green[50],
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: Colors.green[200]!),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.check_circle,
+                                              color: Colors.green, size: 18),
+                                          const SizedBox(width: 8),
+                                          const Expanded(
+                                            child: Text(
+                                              'Вы участвуете',
+                                              style: TextStyle(
+                                                color: Colors.green,
+                                                fontWeight: FontWeight.w600,
+                                                fontSize: 15,
+                                              ),
                                             ),
                                           ),
+                                          TextButton(
+                                            onPressed: () =>
+                                                _unregisterFromEvent(
+                                                    event['id']),
+                                            child: const Text(
+                                              'Отменить',
+                                              style:
+                                                  TextStyle(color: Colors.red),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    )
+                                  : SizedBox(
+                                      width: double.infinity,
+                                      child: ElevatedButton(
+                                        onPressed: () =>
+                                            _registerForEvent(event['id']),
+                                        style: ElevatedButton.styleFrom(
+                                          backgroundColor: Colors.black87,
+                                          foregroundColor: Colors.white,
+                                          padding: const EdgeInsets.symmetric(
+                                              vertical: 14),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius:
+                                                BorderRadius.circular(8),
+                                          ),
+                                          elevation: 0,
                                         ),
-                                        TextButton(
-                                          onPressed: () =>
-                                              _unregisterFromEvent(
-                                                  event['id']),
-                                          child: const Text(
-                                            'Отменить',
-                                            style:
-                                                TextStyle(color: Colors.red),
+                                        child: const Text(
+                                          'Записаться',
+                                          style: TextStyle(
+                                            fontWeight: FontWeight.w600,
+                                            fontSize: 16,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  )
-                                : SizedBox(
-                                    width: double.infinity,
-                                    child: ElevatedButton(
-                                      onPressed: () =>
-                                          _registerForEvent(event['id']),
-                                      style: ElevatedButton.styleFrom(
-                                        backgroundColor: Colors.black87,
-                                        foregroundColor: Colors.white,
-                                        padding: const EdgeInsets.symmetric(
-                                            vertical: 14),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(8),
-                                        ),
-                                        elevation: 0,
-                                      ),
-                                      child: const Text(
-                                        'Записаться',
-                                        style: TextStyle(
-                                          fontWeight: FontWeight.w600,
-                                          fontSize: 16,
-                                        ),
                                       ),
                                     ),
-                                  ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Color _getCategoryColor(String? category) {
     switch (category) {

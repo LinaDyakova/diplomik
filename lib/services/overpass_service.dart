@@ -3,7 +3,7 @@ import 'package:http/http.dart' as http;
 
 class OverpassService {
   static const String _overpassUrl = 'https://overpass-api.de/api/interpreter';
-  static const String _userAgent = 'VroomApp/1.0 (dyakova9227@mail.ru)'; 
+  static const String _userAgent = 'VroomApp/1.0 (your-email@example.com)'; 
 
   static Future<List<Map<String, dynamic>>> fetchNearbyServices(
     double lat,

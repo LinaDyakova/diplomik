@@ -218,15 +218,9 @@ class _SignInScreenState extends State<SignInScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   const SizedBox(height: 40),
-                  // Логотип
-                  const Icon(
-                    Icons.directions_car,
-                    size: 72,
-                    color: Colors.black87,
-                  ),
-                  const SizedBox(height: 16),
+                  // Заголовок: Вход или Регистрация
                   Text(
-                    'Vroom',
+                    _isSignUp ? 'Регистрация' : 'Вход',
                     textAlign: TextAlign.center,
                     style: theme.textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
@@ -234,14 +228,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ),
                   const SizedBox(height: 32),
-                  Text(
-                    _isSignUp ? 'Создайте аккаунт' : 'Войдите в аккаунт',
-                    textAlign: TextAlign.center,
-                    style: theme.textTheme.titleMedium?.copyWith(
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                  const SizedBox(height: 32),
+                  // Поле username (только при регистрации)
                   if (_isSignUp)
                     _buildTextField(
                       controller: _usernameController,
@@ -250,6 +237,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       errorText: _usernameError,
                       onChanged: _onUsernameChanged,
                     ),
+                  // Поле email
                   _buildTextField(
                     controller: _emailController,
                     label: 'Email',
@@ -258,6 +246,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     keyboardType: TextInputType.emailAddress,
                     onChanged: _onEmailChanged,
                   ),
+                  // Поле пароля
                   _buildTextField(
                     controller: _passwordController,
                     label: 'Пароль',
@@ -278,6 +267,7 @@ class _SignInScreenState extends State<SignInScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
+                  // Кнопка действия
                   if (_isLoading)
                     const Center(child: CircularProgressIndicator())
                   else
@@ -301,6 +291,7 @@ class _SignInScreenState extends State<SignInScreen> {
                       ),
                     ),
                   const SizedBox(height: 16),
+                  // Переключение между входом и регистрацией
                   TextButton(
                     onPressed: () {
                       setState(() {

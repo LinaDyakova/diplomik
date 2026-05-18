@@ -15,6 +15,7 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
   final TextEditingController _controller = TextEditingController();
   List<Map<String, dynamic>> _searchResults = [];
   bool _isSearching = false;
+  String? _errorText;
   Timer? _debounce;
 
   @override
@@ -43,10 +44,14 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
       setState(() {
         _searchResults.clear();
         _isSearching = false;
+        _errorText = null;
       });
       return;
     }
-    setState(() => _isSearching = true);
+    setState(() {
+      _isSearching = true;
+      _errorText = null;
+    });
     try {
       final result = await GeocodingService.geocodeCity(query);
       if (result != null) {
@@ -58,11 +63,15 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
         setState(() {
           _searchResults = [];
           _isSearching = false;
+          _errorText = 'Город не найден. Проверьте название.';
         });
       }
     } catch (e) {
-      print('Search error: $e');
-      setState(() => _isSearching = false);
+      setState(() {
+        _searchResults = [];
+        _isSearching = false;
+        _errorText = 'Ошибка поиска. Проверьте интернет.';
+      });
     }
   }
 
@@ -96,6 +105,7 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
                 hintStyle: TextStyle(color: Colors.grey[400]),
                 filled: true,
                 fillColor: Colors.grey[100],
+                errorText: _errorText,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                   borderSide: BorderSide(color: Colors.grey[300]!),
@@ -134,7 +144,7 @@ class _CityPickerDialogState extends State<CityPickerDialog> {
                   },
                 ),
               )
-            else if (_controller.text.isNotEmpty && !_isSearching)
+            else if (_controller.text.isNotEmpty && !_isSearching && _errorText == null)
               const Text(
                 'Город не найден',
                 style: TextStyle(color: Colors.red),

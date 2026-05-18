@@ -51,7 +51,7 @@ class GeocodingService {
     try {
       final response = await http.get(
         Uri.parse('$_nominatimUrl?q=$cityName&format=json&addressdetails=1&limit=5'),
-        headers: {'User-Agent': 'VroomApp/1.0 (dyakova9227@mail.ru)'},
+        headers: {'User-Agent': 'VroomApp/1.0 (your-email@example.com)'},
       );
 
       if (response.statusCode == 200) {

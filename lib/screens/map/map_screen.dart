@@ -59,38 +59,58 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     _getCurrentLocation();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   Future<void> _getCurrentLocation() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return;
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) return;
+    try {
+      bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        _showErrorSnackBar('Службы геолокации отключены. Включите GPS.');
+        return;
+      }
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse && permission != LocationPermission.always) {
+          _showErrorSnackBar('Разрешение на геолокацию не получено.');
+          return;
+        }
+      }
+      final position = await Geolocator.getCurrentPosition();
+      setState(() {
+        _currentPosition = position;
+        _center = LatLng(position.latitude, position.longitude);
+      });
+      _mapController.move(_center, 12);
+      // Загружаем данные после получения локации
+      await Future.wait([
+        _loadServices(),
+        _loadEvents(),
+        _loadFuelStations(),
+      ]);
+      _applyAllFilters();
+    } catch (e) {
+      _showErrorSnackBar('Ошибка получения местоположения: ${e.toString().substring(0, 100)}');
     }
-    final position = await Geolocator.getCurrentPosition();
-    setState(() {
-      _currentPosition = position;
-      _center = LatLng(position.latitude, position.longitude);
-    });
-    _mapController.move(_center, 12);
-    _loadServices();
-    _loadEvents();
-    _loadFuelStations();
-    _applyServiceFilter();
-    _applyEventFilter();
-    _applyFuelStationFilter();
   }
 
   Future<void> _loadUserCity() async {
     final userId = SupabaseConfig.auth.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
     try {
       final response = await SupabaseConfig.client
           .from('profiles')
           .select('city, latitude, longitude')
           .eq('id', userId)
-          .single();
-      if (response['latitude'] != null && response['longitude'] != null) {
+          .maybeSingle(); // используем maybeSingle вместо single, чтобы избежать исключения при отсутствии
+      if (response != null && response['latitude'] != null && response['longitude'] != null) {
         setState(() {
           _center = LatLng(response['latitude'], response['longitude']);
           _cityName = response['city'] ?? 'Город';
@@ -99,7 +119,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         _showCityPicker();
       }
     } catch (e) {
-      print('Error loading city: $e');
+      _showErrorSnackBar('Не удалось загрузить город пользователя');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -118,7 +138,10 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
 
   Future<void> _saveCityToProfile(String city, double lat, double lon) async {
     final userId = SupabaseConfig.auth.currentUser?.id;
-    if (userId == null) return;
+    if (userId == null) {
+      _showErrorSnackBar('Пользователь не авторизован');
+      return;
+    }
     try {
       await SupabaseConfig.client.from('profiles').update({
         'city': city,
@@ -130,11 +153,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
         _cityName = city;
       });
       _mapController.move(_center, 10);
-      _loadServices();
-      _loadEvents();
-      _loadFuelStations();
+      await Future.wait([
+        _loadServices(),
+        _loadEvents(),
+        _loadFuelStations(),
+      ]);
+      _applyAllFilters();
     } catch (e) {
-      print('Error saving city: $e');
+      _showErrorSnackBar('Ошибка сохранения города: ${e.toString()}');
     }
   }
 
@@ -152,7 +178,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
       });
       _applyServiceFilter();
     } catch (e) {
-      print('Error loading services: $e');
+      _showErrorSnackBar('Ошибка загрузки сервисов');
+      setState(() => _filteredServices = []);
     }
   }
 
@@ -198,7 +225,8 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
       });
       _applyEventFilter();
     } catch (e) {
-      print('Error loading events: $e');
+      _showErrorSnackBar('Ошибка загрузки мероприятий');
+      setState(() => _filteredEvents = []);
     }
   }
 
@@ -219,15 +247,14 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
 
   Future<void> _loadFuelStations() async {
     try {
-      final response = await SupabaseConfig.client
-          .from('fuel_stations')
-          .select();
+      final response = await SupabaseConfig.client.from('fuel_stations').select();
       setState(() {
         _allFuelStations = List<Map<String, dynamic>>.from(response);
       });
       _applyFuelStationFilter();
     } catch (e) {
-      print('Error loading fuel stations: $e');
+      _showErrorSnackBar('Ошибка загрузки АЗС');
+      setState(() => _filteredFuelStations = []);
     }
   }
 
@@ -245,16 +272,28 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     });
   }
 
-  void _centerOnUser() {
+  void _applyAllFilters() {
+    _applyServiceFilter();
+    _applyEventFilter();
+    _applyFuelStationFilter();
+  }
+
+  void _centerOnUser() async {
     if (_currentPosition != null) {
-      _mapController.move(LatLng(_currentPosition!.latitude, _currentPosition!.longitude), 14);
-      _loadServices();
-      _loadEvents();
-      _loadFuelStations();
+      try {
+        _mapController.move(LatLng(_currentPosition!.latitude, _currentPosition!.longitude), 14);
+        // Опционально перезагружаем данные
+        await Future.wait([
+          _loadServices(),
+          _loadEvents(),
+          _loadFuelStations(),
+        ]);
+        _applyAllFilters();
+      } catch (e) {
+        _showErrorSnackBar('Ошибка при центрировании карты');
+      }
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Не удалось определить местоположение')),
-      );
+      _showErrorSnackBar('Не удалось определить местоположение');
     }
   }
 
@@ -277,29 +316,34 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     setState(() {
       _searchMode = _searchMode == 'city' ? 'nearby' : 'city';
     });
-    _applyServiceFilter();
-    _applyEventFilter();
-    _applyFuelStationFilter();
+    _applyAllFilters();
     if (_searchMode == 'nearby' && _currentPosition == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Включите геолокацию для поиска рядом со мной')),
-      );
+      _showErrorSnackBar('Включите геолокацию для поиска рядом со мной');
     }
   }
 
-  void _openExternalNavigation(LatLng destination) async {
+  Future<void> _openExternalNavigation(LatLng destination) async {
     final naviUrl = 'yandexnavi://build_route_on_map?lat_to=${destination.latitude}&lon_to=${destination.longitude}';
-    if (await canLaunchUrl(Uri.parse(naviUrl))) {
-      await launchUrl(Uri.parse(naviUrl));
-      return;
-    }
     final mapsUrl = 'yandexmaps://maps.yandex.ru/?pt=${destination.longitude},${destination.latitude}&z=15';
-    if (await canLaunchUrl(Uri.parse(mapsUrl))) {
-      await launchUrl(Uri.parse(mapsUrl));
-      return;
-    }
     final webUrl = 'https://yandex.ru/maps/?pt=${destination.longitude},${destination.latitude}&z=15';
-    await launchUrl(Uri.parse(webUrl));
+
+    try {
+      if (await canLaunchUrl(Uri.parse(naviUrl))) {
+        await launchUrl(Uri.parse(naviUrl));
+        return;
+      }
+      if (await canLaunchUrl(Uri.parse(mapsUrl))) {
+        await launchUrl(Uri.parse(mapsUrl));
+        return;
+      }
+      if (await canLaunchUrl(Uri.parse(webUrl))) {
+        await launchUrl(Uri.parse(webUrl));
+        return;
+      }
+      throw 'Не удалось открыть карту';
+    } catch (e) {
+      _showErrorSnackBar('Ошибка открытия навигации');
+    }
   }
 
   IconData _getEventIcon(String? category) {
@@ -318,20 +362,25 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
   }
 
   Future<void> _updateServiceAverageRating(int serviceId) async {
-    final avgRes = await SupabaseConfig.client
-        .from('service_reviews')
-        .select('rating')
-        .eq('service_id', serviceId);
-    if (avgRes.isEmpty) return;
-    double sum = 0;
-    for (var r in avgRes) {
-      sum += r['rating'] as int;
+    try {
+      final avgRes = await SupabaseConfig.client
+          .from('service_reviews')
+          .select('rating')
+          .eq('service_id', serviceId);
+      if (avgRes.isEmpty) return;
+      double sum = 0;
+      for (var r in avgRes) {
+        sum += r['rating'] as int;
+      }
+      double avg = sum / avgRes.length;
+      await SupabaseConfig.client
+          .from('services')
+          .update({'rating': avg})
+          .eq('id', serviceId);
+    } catch (e) {
+      // Ошибка при пересчёте рейтинга не должна прерывать пользовательский опыт
+      print('Rating update error: $e');
     }
-    double avg = sum / avgRes.length;
-    await SupabaseConfig.client
-        .from('services')
-        .update({'rating': avg})
-        .eq('id', serviceId);
   }
 
   void _showServiceDetails(ServiceModel service) {
@@ -342,13 +391,17 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     }
 
     Future<int?> getUserRating() async {
-      final res = await SupabaseConfig.client
-          .from('service_reviews')
-          .select('rating')
-          .eq('service_id', service.id)
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-      return res?['rating'] as int?;
+      try {
+        final res = await SupabaseConfig.client
+            .from('service_reviews')
+            .select('rating')
+            .eq('service_id', service.id)
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+        return res?['rating'] as int?;
+      } catch (e) {
+        return null;
+      }
     }
 
     showModalBottomSheet(
@@ -438,15 +491,18 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                           _applyServiceFilter();
                                         });
 
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Спасибо за оценку!'), backgroundColor: Colors.green),
-                                        );
-                                        if (mounted) Navigator.pop(context);
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Спасибо за оценку!'), backgroundColor: Colors.green),
+                                          );
+                                          Navigator.pop(context);
+                                        }
                                       } catch (e) {
-                                        print('Rating error: $e');
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
-                                        );
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Ошибка при оценке: ${e.toString().substring(0, 100)}'), backgroundColor: Colors.red),
+                                          );
+                                        }
                                         setStateModal(() => isSubmitting = false);
                                       }
                                     },
@@ -540,20 +596,24 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
   }
 
   Future<void> _updateFuelStationAverageRating(int stationId) async {
-    final avgRes = await SupabaseConfig.client
-        .from('fuel_station_reviews')
-        .select('rating')
-        .eq('fuel_station_id', stationId);
-    if (avgRes.isEmpty) return;
-    double sum = 0;
-    for (var r in avgRes) {
-      sum += r['rating'] as int;
+    try {
+      final avgRes = await SupabaseConfig.client
+          .from('fuel_station_reviews')
+          .select('rating')
+          .eq('fuel_station_id', stationId);
+      if (avgRes.isEmpty) return;
+      double sum = 0;
+      for (var r in avgRes) {
+        sum += r['rating'] as int;
+      }
+      double avg = sum / avgRes.length;
+      await SupabaseConfig.client
+          .from('fuel_stations')
+          .update({'rating': avg})
+          .eq('id', stationId);
+    } catch (e) {
+      print('Rating update error: $e');
     }
-    double avg = sum / avgRes.length;
-    await SupabaseConfig.client
-        .from('fuel_stations')
-        .update({'rating': avg})
-        .eq('id', stationId);
   }
 
   void _showFuelStationDetails(Map<String, dynamic> station) {
@@ -564,13 +624,17 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     }
 
     Future<int?> getUserRating() async {
-      final res = await SupabaseConfig.client
-          .from('fuel_station_reviews')
-          .select('rating')
-          .eq('fuel_station_id', station['id'])
-          .eq('user_id', currentUserId)
-          .maybeSingle();
-      return res?['rating'] as int?;
+      try {
+        final res = await SupabaseConfig.client
+            .from('fuel_station_reviews')
+            .select('rating')
+            .eq('fuel_station_id', station['id'])
+            .eq('user_id', currentUserId)
+            .maybeSingle();
+        return res?['rating'] as int?;
+      } catch (e) {
+        return null;
+      }
     }
 
     showModalBottomSheet(
@@ -659,15 +723,18 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                                           _applyFuelStationFilter();
                                         });
 
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          const SnackBar(content: Text('Спасибо за оценку!'), backgroundColor: Colors.green),
-                                        );
-                                        if (mounted) Navigator.pop(context);
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            const SnackBar(content: Text('Спасибо за оценку!'), backgroundColor: Colors.green),
+                                          );
+                                          Navigator.pop(context);
+                                        }
                                       } catch (e) {
-                                        print('Rating error: $e');
-                                        ScaffoldMessenger.of(context).showSnackBar(
-                                          SnackBar(content: Text('Ошибка: $e'), backgroundColor: Colors.red),
-                                        );
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(content: Text('Ошибка: ${e.toString().substring(0, 100)}'), backgroundColor: Colors.red),
+                                          );
+                                        }
                                         setStateModal(() => isSubmitting = false);
                                       }
                                     },
@@ -810,6 +877,13 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
     );
   }
 
+  void _showErrorSnackBar(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: Colors.red),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -824,7 +898,6 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
             onPressed: _centerOnUser,
             tooltip: 'Моё местоположение',
           ),
-          // Иконка фильтра с индикатором активного фильтра
           IconButton(
             icon: Stack(
               children: [
@@ -840,11 +913,7 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
                       ),
                       child: const Text(
                         '!',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                        ),
+                        style: TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold),
                       ),
                     ),
                   ),
@@ -866,7 +935,6 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
             tooltip: _searchMode == 'city' ? 'Показать рядом со мной' : 'Показать по городу',
           ),
         ],
-        // Классический TabBar с полоской под словами
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.black87,
@@ -883,141 +951,137 @@ class _MapScreenState extends State<MapScreen> with SingleTickerProviderStateMix
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.black87))
-          : Stack(
+          : FlutterMap(
+              mapController: _mapController,
+              options: MapOptions(
+                center: _center,
+                zoom: 10,
+              ),
               children: [
-                FlutterMap(
-                  mapController: _mapController,
-                  options: MapOptions(
-                    center: _center,
-                    zoom: 10,
-                  ),
-                  children: [
-                    TileLayer(
-                      urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                      userAgentPackageName: 'com.example.vroom',
-                    ),
-                    if (_tabController.index == 0 && _showServices)
-                      MarkerClusterLayerWidget(
-                        options: MarkerClusterLayerOptions(
-                          size: const Size(40, 40),
-                          markers: _filteredServices.map((service) {
-                            return Marker(
-                              width: 40,
-                              height: 40,
-                              point: LatLng(service.latitude, service.longitude),
-                              child: GestureDetector(
-                                onTap: () => _showServiceDetails(service),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF4A90E2),
-                                    shape: BoxShape.circle,
-                                    boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
-                                  ),
-                                  child: const Icon(Icons.car_repair, color: Colors.white, size: 20),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          builder: (context, markers) {
-                            return Container(
+                TileLayer(
+                  urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                  userAgentPackageName: 'com.example.vroom',
+                ),
+                if (_tabController.index == 0 && _showServices)
+                  MarkerClusterLayerWidget(
+                    options: MarkerClusterLayerOptions(
+                      size: const Size(40, 40),
+                      markers: _filteredServices.map((service) {
+                        return Marker(
+                          width: 40,
+                          height: 40,
+                          point: LatLng(service.latitude, service.longitude),
+                          child: GestureDetector(
+                            onTap: () => _showServiceDetails(service),
+                            child: Container(
                               decoration: BoxDecoration(
                                 color: const Color(0xFF4A90E2),
                                 shape: BoxShape.circle,
                                 boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                               ),
-                              child: Center(
-                                child: Text(
-                                  markers.length.toString(),
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    if (_tabController.index == 1 && _showEvents)
-                      MarkerLayer(
-                        markers: _filteredEvents.map((event) {
-                          if (event['latitude'] == null || event['longitude'] == null) return null;
-                          final category = event['category'];
-                          return Marker(
-                            width: 40,
-                            height: 40,
-                            point: LatLng(event['latitude'], event['longitude']),
-                            child: GestureDetector(
-                              onTap: () => _showEventDetails(event),
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: const Color(0xFFE25C4A),
-                                  shape: BoxShape.circle,
-                                  boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
-                                ),
-                                child: Icon(_getEventIcon(category), color: Colors.white, size: 20),
-                              ),
+                              child: const Icon(Icons.car_repair, color: Colors.white, size: 20),
                             ),
-                          );
-                        }).whereType<Marker>().toList(),
-                      ),
-                    if (_tabController.index == 2)
-                      MarkerClusterLayerWidget(
-                        options: MarkerClusterLayerOptions(
-                          size: const Size(40, 40),
-                          markers: _filteredFuelStations.map((station) {
-                            return Marker(
-                              width: 40,
-                              height: 40,
-                              point: LatLng(station['latitude'], station['longitude']),
-                              child: GestureDetector(
-                                onTap: () => _showFuelStationDetails(station),
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF2ECC71),
-                                    shape: BoxShape.circle,
-                                    boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
-                                  ),
-                                  child: const Icon(Icons.local_gas_station, color: Colors.white, size: 20),
-                                ),
-                              ),
-                            );
-                          }).toList(),
-                          builder: (context, markers) {
-                            return Container(
+                          ),
+                        );
+                      }).toList(),
+                      builder: (context, markers) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF4A90E2),
+                            shape: BoxShape.circle,
+                            boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
+                          ),
+                          child: Center(
+                            child: Text(
+                              markers.length.toString(),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (_tabController.index == 1 && _showEvents)
+                  MarkerLayer(
+                    markers: _filteredEvents.map((event) {
+                      if (event['latitude'] == null || event['longitude'] == null) return null;
+                      final category = event['category'];
+                      return Marker(
+                        width: 40,
+                        height: 40,
+                        point: LatLng(event['latitude'], event['longitude']),
+                        child: GestureDetector(
+                          onTap: () => _showEventDetails(event),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE25C4A),
+                              shape: BoxShape.circle,
+                              boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
+                            ),
+                            child: Icon(_getEventIcon(category), color: Colors.white, size: 20),
+                          ),
+                        ),
+                      );
+                    }).whereType<Marker>().toList(),
+                  ),
+                if (_tabController.index == 2)
+                  MarkerClusterLayerWidget(
+                    options: MarkerClusterLayerOptions(
+                      size: const Size(40, 40),
+                      markers: _filteredFuelStations.map((station) {
+                        return Marker(
+                          width: 40,
+                          height: 40,
+                          point: LatLng(station['latitude'], station['longitude']),
+                          child: GestureDetector(
+                            onTap: () => _showFuelStationDetails(station),
+                            child: Container(
                               decoration: BoxDecoration(
                                 color: const Color(0xFF2ECC71),
                                 shape: BoxShape.circle,
                                 boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
                               ),
-                              child: Center(
-                                child: Text(
-                                  markers.length.toString(),
-                                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    if (_currentPosition != null)
-                      MarkerLayer(
-                        markers: [
-                          Marker(
-                            width: 40,
-                            height: 40,
-                            point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.black87,
-                                shape: BoxShape.circle,
-                                border: Border.all(color: Colors.white, width: 2),
-                                boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
-                              ),
-                              child: const Icon(Icons.my_location, color: Colors.white, size: 20),
+                              child: const Icon(Icons.local_gas_station, color: Colors.white, size: 20),
                             ),
                           ),
-                        ],
+                        );
+                      }).toList(),
+                      builder: (context, markers) {
+                        return Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFF2ECC71),
+                            shape: BoxShape.circle,
+                            boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
+                          ),
+                          child: Center(
+                            child: Text(
+                              markers.length.toString(),
+                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                if (_currentPosition != null)
+                  MarkerLayer(
+                    markers: [
+                      Marker(
+                        width: 40,
+                        height: 40,
+                        point: LatLng(_currentPosition!.latitude, _currentPosition!.longitude),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.black87,
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 2),
+                            boxShadow: const [BoxShadow(blurRadius: 4, color: Colors.black26)],
+                          ),
+                          child: const Icon(Icons.my_location, color: Colors.white, size: 20),
+                        ),
                       ),
-                  ],
-                ),
+                    ],
+                  ),
               ],
             ),
     );
